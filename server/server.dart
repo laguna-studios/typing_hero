@@ -8,16 +8,10 @@ import 'package:shelf_web_socket/shelf_web_socket.dart';
 import 'package:typing_hero/types.dart';
 import 'package:uuid/uuid.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import 'wordlist.dart';
 
-const List<String> words = [
-  "Esel",
-  "Schule",
-  "Fahrrad",
-  "Apfel",
-  "sehen",
-  "laufen",
-  "Schulbeginn"
-];
+//const String ip = "10.16.30.108";
+const String ip = "localhost";
 
 void main() async {
 
@@ -42,7 +36,12 @@ class GameServer {
     client.stream.listen((event) {
       Message msg = Message.fromJson(json.decode(event));
       _onMessage(client, msg);
+    }, onError: (event) {
+      print("Error with $client on $event");
+    }, onDone: () {
+      print("Done with client: $client");
     });
+    
   }
 
   void _onMessage(WebSocketChannel client, Message message) {
@@ -81,7 +80,9 @@ class GameServer {
         var req = StartGameMessage.fromJson(json.decode(message.data));
         print(req);
 
-        var res = WordsMessage(words: words, minutes: req.minutes);
+        var randomWords = List<String>.from(words);
+        randomWords.shuffle();
+        var res = WordsMessage(words: randomWords, minutes: req.minutes);
         for (var c in _clients) {
           c.sink.add(json.encode(Message(type: MessageType.wordsRes.index, data: json.encode(res.toJson())).toJson()));
         }
@@ -100,7 +101,7 @@ class GameServer {
   }
 
   void run() {
-    serve(_handler, "localhost", 9999);
+    serve(_handler, ip, 9999);
   }
 
 }

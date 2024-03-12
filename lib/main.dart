@@ -7,6 +7,7 @@ import 'package:web_socket_channel/status.dart';
 import 'package:bloc/bloc.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+//const String ip = "10.16.30.108";
 const String ip = "localhost";
 const List<Color> teams = [
   Colors.green,
@@ -65,6 +66,7 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              Spacer(),
               SizedBox(
                   width: 260,
                   child: TextField(
@@ -77,6 +79,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 height: 8,
               ),
               SizedBox(
+                  height: 48,
                   width: 260,
                   child: OutlinedButton(
                       onPressed: () {
@@ -84,16 +87,20 @@ class _LoginScreenState extends State<LoginScreen> {
                         KidsCubit.of(context).setUsername(_controller.text);
                       },
                       child: Text("Weiter"))),
-              SizedBox(
-                height: 8,
+              Spacer(),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Opacity(
+                  opacity: 0.1,
+                  child: SizedBox(
+                      width: 260,
+                      child: OutlinedButton(
+                          onPressed: () {
+                            AdminStartScreen.start(context);
+                          },
+                          child: Text("Admin"))),
+                ),
               ),
-              SizedBox(
-                  width: 260,
-                  child: OutlinedButton(
-                      onPressed: () {
-                        AdminStartScreen.start(context);
-                      },
-                      child: Text("Admin"))),
             ],
           ),
         ),
@@ -116,104 +123,113 @@ class KidsGameScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: BlocBuilder<KidsCubit, KidsState>(
-          buildWhen: (previous, current) =>
-              current.secondsLeft == -1 ||
-              (previous.currentWord.isEmpty && current.currentWord.isNotEmpty),
-          builder: (context, state) {
-            if (state.currentWord.isEmpty) {
-              return Center(
-                child: Text(
-                  "Mache dich bereit!\nDas Spiel geht gleich los...",
-                  style: gameOverTextStyle,
-                  textAlign: TextAlign.center,
-                ),
-              );
-            }
-
-            if (state.secondsLeft == -1) {
-              return Center(
-                child: Text(
-                  "Gut gemacht!\nDas Spiel ist vorbei :)",
-                  style: gameOverTextStyle,
-                  textAlign: TextAlign.center,
-                ),
-              );
-            }
-
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: BlocBuilder<KidsCubit, KidsState>(
-                      builder: (context, state) {
-                    return Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                            child: Text(
-                          "Punkte: ${state.points}",
-                          style: hudTextStyle,
-                        )),
-                        Expanded(
-                            child: Text(
-                          state.username,
-                          textAlign: TextAlign.center,
-                          style: hudTextStyle,
-                        )),
-                        Expanded(
-                            child: Text(
-                          "Verbleibende Zeit: ${state.secondsLeft}",
-                          textAlign: TextAlign.end,
-                          style: hudTextStyle,
-                        )),
-                      ],
-                    );
-                  }),
-                ),
-                Expanded(
-                    child: Center(
-                        child: KeyboardListener(
-                            focusNode: FocusNode(),
-                            autofocus: true,
-                            onKeyEvent: (value) {
-                              String? char = value.character;
-                              if (char == null) return;
-                              KidsCubit.of(context).onKeyPressed(char);
-                            },
-                            child: BlocBuilder<KidsCubit, KidsState>(
-                                buildWhen: (previous, current) =>
-                                    previous.currentWord !=
-                                        current.currentWord ||
-                                    previous.currentText != current.currentText,
-                                builder: (context, state) => RichText(
-                                        text: TextSpan(
-                                            text: state.currentText,
-                                            style: TextStyle(
-                                                fontSize: 160,
-                                                color: Colors.green),
-                                            children: <TextSpan>[
-                                          TextSpan(
-                                              text: state.currentWord.substring(
-                                                  state.currentText.length),
+    return GestureDetector(
+      onTap: () {
+        if (!KidsCubit.of(context).focusNode.hasFocus) {
+          KidsCubit.of(context).focusNode.requestFocus();
+          print("Requested Focus");
+        }
+      },
+      child: Scaffold(
+        body: BlocBuilder<KidsCubit, KidsState>(
+            buildWhen: (previous, current) =>
+                current.secondsLeft == -1 ||
+                (previous.currentWord.isEmpty && current.currentWord.isNotEmpty) ||
+                (previous.secondsLeft == -1 && current.secondsLeft >= 60),
+            builder: (context, state) {
+              if (state.currentWord.isEmpty) {
+                return Center(
+                  child: Text(
+                    "Mache dich bereit!\nDas Spiel geht gleich los...",
+                    style: gameOverTextStyle,
+                    textAlign: TextAlign.center,
+                  ),
+                );
+              }
+      
+              if (state.secondsLeft == -1) {
+                return Center(
+                  child: Text(
+                    "Gut gemacht!\nDas Spiel ist vorbei :)",
+                    style: gameOverTextStyle,
+                    textAlign: TextAlign.center,
+                  ),
+                );
+              }
+      
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: BlocBuilder<KidsCubit, KidsState>(
+                        builder: (context, state) {
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                              child: Text(
+                            "Punkte: ${state.points}",
+                            style: hudTextStyle,
+                          )),
+                          Expanded(
+                              child: Text(
+                            state.username,
+                            textAlign: TextAlign.center,
+                            style: hudTextStyle,
+                          )),
+                          Expanded(
+                              child: Text(
+                            "Verbleibende Zeit: ${state.secondsLeft}",
+                            textAlign: TextAlign.end,
+                            style: hudTextStyle,
+                          )),
+                        ],
+                      );
+                    }),
+                  ),
+                  Expanded(
+                      child: Center(
+                          child: KeyboardListener(
+                              focusNode: KidsCubit.of(context).focusNode,
+                              autofocus: true,
+                              onKeyEvent: (value) {
+                                String? char = value.character;
+                                if (char == null) return;
+                                KidsCubit.of(context).onKeyPressed(char);
+                              },
+                              child: BlocBuilder<KidsCubit, KidsState>(
+                                  buildWhen: (previous, current) =>
+                                      previous.currentWord !=
+                                          current.currentWord ||
+                                      previous.currentText != current.currentText,
+                                  builder: (context, state) => RichText(
+                                          text: TextSpan(
+                                              text: state.currentText,
                                               style: TextStyle(
                                                   fontSize: 160,
-                                                  color: Colors.black
-                                                      .withAlpha(100)))
-                                        ])))))),
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Text(
-                    "Schreibe das Wort oder den Satz!",
-                    style: hudTextStyle,
-                  ),
-                )
-              ],
-            );
-          }),
+                                                  color: Colors.green),
+                                              children: <TextSpan>[
+                                            TextSpan(
+                                                text: state.currentWord.substring(
+                                                    state.currentText.length),
+                                                style: TextStyle(
+                                                    fontSize: 160,
+                                                    color: Colors.black
+                                                        .withAlpha(100)))
+                                          ])))))),
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Text(
+                      "Schreibe das Wort oder den Satz!",
+                      style: hudTextStyle,
+                    ),
+                  )
+                ],
+              );
+            }),
+      ),
     );
   }
 }
@@ -234,6 +250,9 @@ class AdminStartScreen extends StatefulWidget {
 }
 
 class _AdminStartScreenState extends State<AdminStartScreen> {
+
+  static const TextStyle _tableTextStyle = TextStyle(fontSize: 24);
+
   final TextEditingController _minutesController = TextEditingController();
   final TextEditingController _groupCountController =
       TextEditingController(text: "2");
@@ -337,9 +356,21 @@ class _AdminStartScreenState extends State<AdminStartScreen> {
                               child: ListView.builder(
                                   itemCount: state.players.length,
                                   itemBuilder: (context, index) {
-                                    return ListTile(
-                                      title: Text(
-                                          "${index + 1}. ${state.players[index].username.padRight(50)} Punkte: ${state.players[index].points}"),
+                                    return SizedBox(
+                                      height: 50,
+                                      child: Row(
+                                        children: [
+                                          SizedBox(width: 24),
+                                          Text("${index + 1}.", style: _tableTextStyle,),
+                                          SizedBox(width: 16,),
+                                          Text("${state.players[index].username}", style: _tableTextStyle,),
+                                          Spacer(),
+                                          SizedBox(
+                                            width: 200, child: Text("Punkte: ${state.players[index].points}", style: _tableTextStyle,)),
+                                        ]
+                                        
+                                            
+                                      ),
                                     );
                                   })),
                         ],
@@ -466,6 +497,8 @@ class TalkRepository {
             .map<Message>((event) => Message.fromJson(json.decode(event)))
             .asBroadcastStream();
 
+            
+
   void _send(MessageType type, Map<String, Object?> data) => channel.sink.add(
       json.encode(Message(type: type.index, data: json.encode(data)).toJson()));
 
@@ -494,6 +527,7 @@ class KidsCubit extends Cubit<KidsState> {
 
   final TalkRepository _repository;
   final List<String> _words = [];
+  final FocusNode focusNode = FocusNode();
 
   KidsCubit({required TalkRepository repository})
       : _repository = repository,

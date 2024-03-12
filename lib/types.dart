@@ -25,7 +25,6 @@ enum MessageType {
   startGame
 }
 
-
 @freezed
 class Message with _$Message {
   const factory Message({
