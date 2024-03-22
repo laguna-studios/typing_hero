@@ -10,7 +10,7 @@ import 'package:collection/collection.dart';
 
 void main() {
   runApp(TypingApp(
-    gameRepository: GameRepository(hostname: "localhost", port: 9999),
+    gameRepository: GameRepository(hostname: "10.16.107.114", port: 9999),
   ));
 }
 
@@ -481,14 +481,17 @@ class TeamPlayView extends StatelessWidget {
       builder: (context, teacherState) {
         return BlocBuilder<GameCubit, AppState>(
           builder: (context, appState) {
+            List<User> players = List.from(appState.gameRoom?.players ?? []);
+            players.sort((a, b) => b.points - a.points);
+
             return Row(
               children: [
                 Expanded(
                   flex: 1,
                   child: ListView.builder(
-                      itemCount: appState.gameRoom?.players.length ?? 0,
+                      itemCount: players.length,
                       itemBuilder: (context, index) {
-                        User user = appState.gameRoom!.players[index];
+                        User user = players[index];
 
                         return Draggable(
                           data: user,

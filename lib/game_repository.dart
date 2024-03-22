@@ -111,14 +111,14 @@ class GameRepository {
     _webSocketChannel.sink.close();
   }
 
-  void _send(Type type, Map<String, Object?> json) {
+  void _send(String type, Map<String, Object?> json) {
     json["type"] = type.toString();
     _webSocketChannel.sink.add(jsonEncode(json));
   }
 
   // Teacher Methods
   void createRoom() {
-    _send(CreateRoomMessage, CreateRoomMessage().toJson());
+    _send("CreateRoomMessage", CreateRoomMessage().toJson());
   }
 
   void closeRoom(bool closed) {
@@ -126,28 +126,28 @@ class GameRepository {
       _errorStreamController.add("Du hast dich in keinem Raum angemeldet!");
       return;
     }
-    _send(CloseRoomMessage, CloseRoomMessage(pin: _gameRoomPin!, closed: closed).toJson());
+    _send("CloseRoomMessage", CloseRoomMessage(pin: _gameRoomPin!, closed: closed).toJson());
   }
 
   void startGame(Game game) {
-    _send(StartGameMessage, StartGameMessage(pin: _gameRoomPin!, game: game).toJson());
+    _send("StartGameMessage", StartGameMessage(pin: _gameRoomPin!, game: game).toJson());
   }
 
   void resetPoints() {
-    _send(ResetPointsMessage, ResetPointsMessage(pin: _gameRoomPin!).toJson());
+    _send("ResetPointsMessage", ResetPointsMessage(pin: _gameRoomPin!).toJson());
   }
 
   // Player Methods
   void joinRoom(int pin) {
     _gameRoomPin = pin;
-    _send(EnterRoomMessage, EnterRoomMessage(pin: pin).toJson());
+    _send("EnterRoomMessage", EnterRoomMessage(pin: pin).toJson());
   }
 
   void saveUsername(int pin, String username) {
-    _send(SaveUsernameMessage, SaveUsernameMessage(pin: pin, username: username).toJson());
+    _send("SaveUsernameMessage", SaveUsernameMessage(pin: pin, username: username).toJson());
   }
 
   void scorePoints(int points) {
-    _send(ScorePointsMessage, ScorePointsMessage(pin: _gameRoomPin!, points: points).toJson());
+    _send("ScorePointsMessage", ScorePointsMessage(pin: _gameRoomPin!, points: points).toJson());
   }
 }

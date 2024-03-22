@@ -16,8 +16,7 @@ import 'package:typing_hero/types/startgamemessage.dart';
 import 'package:uuid/uuid.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-//const String ip = "10.16.30.108";
-const String ip = "localhost";
+const String ip = "10.16.107.114";
 
 void main() async {
 
@@ -61,21 +60,21 @@ class GameServer {
     connections[id] = null;
   }
 
-  void _send(String userId, Type type, Map<String, Object?> json) {
+  void _send(String userId, String type, Map<String, Object?> json) {
 
     WebSocketChannel? client = connections[userId];
     if (client == null) return;
 
-    json["type"] = type.toString();
+    json["type"] = type;
     client.sink.add(jsonEncode(json));
   }
 
   void _sendUnauthorizedError(String userId, {String tag = ""}) {
-    _send(userId, ErrorMessage, ErrorMessage(message: "$tag: Unautorisierter Zugriff").toJson());
+    _send(userId, "ErrorMessage", ErrorMessage(message: "$tag: Unautorisierter Zugriff").toJson());
   }
 
   void _sendRoomNotFound(String userId, {String tag = ""}) {
-        _send(userId, ErrorMessage, ErrorMessage(message: "$tag: Raum nicht gefunden").toJson());
+        _send(userId, "ErrorMessage", ErrorMessage(message: "$tag: Raum nicht gefunden").toJson());
   }
 
   Future<void> _onMessage(String userId, dynamic message) async {
@@ -91,13 +90,13 @@ class GameServer {
         // find room
         int index = rooms.indexWhere((room) => room.pin == req.pin);
         if (index == -1) {
-          _send(userId, ErrorMessage, ErrorMessage(message: "Der Game Pin ${req.pin} ist ungültig!").toJson());
+          _send(userId, "ErrorMessage", ErrorMessage(message: "Der Game Pin ${req.pin} ist ungültig!").toJson());
           return;
         }
 
         // room is closed
         if (!rooms[index].open) {
-          _send(userId, ErrorMessage, ErrorMessage(message: "Der Raum ist schon geschlossen!").toJson());
+          _send(userId, "ErrorMessage", ErrorMessage(message: "Der Raum ist schon geschlossen!").toJson());
           return;
         }
 
@@ -105,12 +104,12 @@ class GameServer {
         User user = User(id: userId, username: "Spieler ${rooms[index].players.length + 1}", points: 0, gameRoomPin: req.pin);
         rooms[index].players.add(user);
 
-        _send(userId, User, user.toJson());
-        _send(rooms[index].ownerId, GameRoom, rooms[index].toJson());
+        _send(userId, "User", user.toJson());
+        _send(rooms[index].ownerId, "GameRoom", rooms[index].toJson());
 
         // send game to new player
         if (rooms[index].game != null) {
-          _send(userId, Game, rooms[index].game!.toJson());
+          _send(userId, "Game", rooms[index].game!.toJson());
         }
 
       case "SaveUsernameMessage":
@@ -123,21 +122,21 @@ class GameServer {
         }
 
         if (rooms[roomIndex].players.any((player) => player.id != userId && player.username == req.username) || req.username.startsWith("Spieler")) {
-          _send(userId, ErrorMessage, ErrorMessage(message: "Der Benutzername ist schon vergeben!").toJson());
+          _send(userId, "ErrorMessage", ErrorMessage(message: "Der Benutzername ist schon vergeben!").toJson());
           return;
         }
 
         int userIndex = rooms[roomIndex].players.indexWhere((user) => user.id == userId);
         if (userIndex == -1) {
-          _send(userId, ErrorMessage, ErrorMessage(message: "Konnte den Benutzernamen nicht speichern! Grund: Benutzer-ID ungültig").toJson());
+          _send(userId, "ErrorMessage", ErrorMessage(message: "Konnte den Benutzernamen nicht speichern! Grund: Benutzer-ID ungültig").toJson());
           return;
         }
 
         
         rooms[roomIndex].players[userIndex].username = req.username;
         
-        _send(userId, User, rooms[roomIndex].players[userIndex].toJson());
-        _send(rooms[roomIndex].ownerId, GameRoom, rooms[roomIndex].toJson());
+        _send(userId, "User", rooms[roomIndex].players[userIndex].toJson());
+        _send(rooms[roomIndex].ownerId, "GameRoom", rooms[roomIndex].toJson());
 
       case "ScorePointsMessage":
         ScorePointsMessage req = ScorePointsMessage.fromJson(json);
@@ -150,19 +149,19 @@ class GameServer {
 
         int playerIndex = rooms[roomIndex].players.indexWhere((element) => element.id == userId);
         if (playerIndex == -1) {
-          _send(userId, ErrorMessage, ErrorMessage(message: "ScorePointsMessage: Ungültige UserID").toJson());
+          _send(userId, "ErrorMessage", ErrorMessage(message: "ScorePointsMessage: Ungültige UserID").toJson());
           return;
         }
 
         rooms[roomIndex].players[playerIndex].points = rooms[roomIndex].players[playerIndex].points + req.points;
 
-        _send(rooms[roomIndex].ownerId, GameRoom, rooms[roomIndex].toJson());
-        _send(userId, User, rooms[roomIndex].players[playerIndex].toJson());
+        _send(rooms[roomIndex].ownerId, "GameRoom", rooms[roomIndex].toJson());
+        _send(userId, "User", rooms[roomIndex].players[playerIndex].toJson());
 
       case "CreateRoomMessage":
         GameRoom room = GameRoom(ownerId: userId, pin: _getRandomRoomPin(), open: true, players: [], game: null);
         rooms.add(room);
-        _send(userId, GameRoom, room.toJson());
+        _send(userId, "GameRoom", room.toJson());
 
       case "CloseRoomMessage":
         CloseRoomMessage req = CloseRoomMessage.fromJson(json);
@@ -177,7 +176,7 @@ class GameServer {
         rooms[index].open = !req.closed;
 
         // update teacher
-        _send(userId, GameRoom, rooms[index].toJson());
+        _send(userId, "GameRoom", rooms[index].toJson());
 
       case "StartGameMessage":
         StartGameMessage req = StartGameMessage.fromJson(json);
@@ -198,9 +197,9 @@ class GameServer {
         rooms[roomIndex].game = req.game;
 
         // send game to teacher and client
-        _send(rooms[roomIndex].ownerId, GameRoom, rooms[roomIndex].toJson());
+        _send(rooms[roomIndex].ownerId, "GameRoom", rooms[roomIndex].toJson());
         for (User user in rooms[roomIndex].players) {
-          _send(user.id, Game, req.game.toJson());
+          _send(user.id, "Game", req.game.toJson());
         }
 
       case "ResetPointsMessage":
@@ -221,10 +220,10 @@ class GameServer {
 
         for (int i = 0; i < rooms[roomIndex].players.length; i++) {
           rooms[roomIndex].players[i].points = 0;
-          _send(rooms[roomIndex].players[i].id, User, rooms[roomIndex].players[i].toJson());
+          _send(rooms[roomIndex].players[i].id, "User", rooms[roomIndex].players[i].toJson());
         }
 
-        _send(rooms[roomIndex].ownerId, GameRoom, rooms[roomIndex].toJson());
+        _send(rooms[roomIndex].ownerId, "GameRoom", rooms[roomIndex].toJson());
 
       default:
         print("[!] Unknown Message: $json");
