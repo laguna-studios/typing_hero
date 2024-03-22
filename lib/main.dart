@@ -1,106 +1,118 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:typing_hero/types.dart';
-import 'package:web_socket_channel/web_socket_channel.dart';
-import 'package:web_socket_channel/status.dart';
-import 'package:bloc/bloc.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
-//const String ip = "10.16.30.108";
-const String ip = "localhost";
-const List<Color> teams = [
-  Colors.green,
-  Colors.blue,
-  Colors.orange,
-  Colors.purple,
-  Colors.pink
-];
+import 'package:random_avatar/random_avatar.dart';
+import 'package:typing_hero/cubit/game_cubit.dart';
+import 'package:typing_hero/cubit/teacher_cubit.dart';
+import 'package:typing_hero/game_repository.dart';
+import 'package:typing_hero/types.dart';
+import 'package:collection/collection.dart';
 
 void main() {
-  TalkRepository talkRepository = TalkRepository(
-      channel: WebSocketChannel.connect(Uri.parse("ws://$ip:9999")));
-  runApp(TypingHeroApp(
-    repository: talkRepository,
+  runApp(TypingApp(
+    gameRepository: GameRepository(hostname: "localhost", port: 9999),
   ));
 }
 
-class TypingHeroApp extends StatelessWidget {
-  final TalkRepository _repository;
+class TypingApp extends StatelessWidget {
+  final GameRepository gameRepository;
 
-  const TypingHeroApp({super.key, required TalkRepository repository})
-      : _repository = repository;
+  const TypingApp({super.key, required this.gameRepository});
 
   @override
   Widget build(BuildContext context) {
-    return RepositoryProvider(
-      create: (_) => _repository,
-      child: BlocProvider<KidsCubit>(
-        create: (context) => KidsCubit(repository: _repository),
+    return RepositoryProvider<GameRepository>(
+      create: (context) => gameRepository,
+      child: MultiBlocProvider(
+        providers: [
+          BlocProvider<GameCubit>(
+            create: (context) => GameCubit(GameCubit.initialState,
+                gameRepository: gameRepository),
+          ),
+          BlocProvider<TeacherCubit>(
+            create: (context) => TeacherCubit(TeacherCubit.initialState,
+                gameRepository: gameRepository),
+          ),
+        ],
         child: MaterialApp(
-          home: LoginScreen(),
+          home: BlocListener<GameCubit, AppState>(
+            listenWhen: (previous, current) =>
+                previous.currentScreen != current.currentScreen,
+            listener: (context, state) {
+              Navigator.of(context).push(MaterialPageRoute(builder: (_) {
+                return switch (state.currentScreen) {
+                  UsernameScreen.screenIndex => UsernameScreen(),
+                  GamePinPreviewScreen.screenIndex => GamePinPreviewScreen(),
+                  TeacherScreen.screenIndex => TeacherScreen(),
+                  LobbyScreen.screenIndex => LobbyScreen(),
+                  GameScreen.screenIndex => GameScreen(),
+                  GameOverScreen.screenIndex => GameOverScreen(),
+                  _ => GamePinScreen(),
+                };
+              }));
+            },
+            child: GamePinScreen(),
+          ),
         ),
       ),
     );
   }
 }
 
-class LoginScreen extends StatefulWidget {
-  @override
-  State<LoginScreen> createState() => _LoginScreenState();
-}
+class ErrorListener extends StatelessWidget {
+  final Widget child;
 
-class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _controller = TextEditingController();
+  const ErrorListener({super.key, required this.child});
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<KidsCubit, KidsState>(
+    return BlocListener<GameCubit, AppState>(
       listenWhen: (previous, current) =>
-          previous.username.isEmpty && current.username.isNotEmpty,
+          current.error.isNotEmpty && previous.error != current.error,
       listener: (context, state) {
-        KidsGameScreen.start(context);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+            (state.error.split(" ")..removeAt(0)).join(" "),
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 20),
+          ),
+          backgroundColor: Colors.redAccent,
+        ));
       },
-      child: Scaffold(
-        body: Center(
+      child: child,
+    );
+  }
+}
+
+class GamePinScreen extends StatelessWidget {
+  static const int screenIndex = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: ErrorListener(
+        child: Center(
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              Spacer(),
+              const Spacer(),
               SizedBox(
-                  width: 260,
+                  width: 250,
                   child: TextField(
-                    controller: _controller,
+                    controller: context.read<GameCubit>().gamePinController,
                     decoration: InputDecoration(
-                        border: OutlineInputBorder(),
-                        labelText: "Benutzername"),
+                        border: OutlineInputBorder(), labelText: "GAME PIN"),
                   )),
-              SizedBox(
+              const SizedBox(
                 height: 8,
               ),
-              SizedBox(
-                  height: 48,
-                  width: 260,
-                  child: OutlinedButton(
-                      onPressed: () {
-                        if (_controller.text.isEmpty) return;
-                        KidsCubit.of(context).setUsername(_controller.text);
-                      },
-                      child: Text("Weiter"))),
-              Spacer(),
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Opacity(
-                  opacity: 0.1,
-                  child: SizedBox(
-                      width: 260,
-                      child: OutlinedButton(
-                          onPressed: () {
-                            AdminStartScreen.start(context);
-                          },
-                          child: Text("Admin"))),
-                ),
-              ),
+              OutlinedButton(
+                  onPressed: context.read<GameCubit>().joinRoom,
+                  child: Text("Los gehts!")),
+              const Spacer(),
+              OutlinedButton(
+                  onPressed: context.read<GameCubit>().createRoom,
+                  child: const Text("Weiter als Lehrer")),
+              const SizedBox(height: 8)
             ],
           ),
         ),
@@ -109,555 +121,455 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-class KidsGameScreen extends StatelessWidget {
-  static const TextStyle hudTextStyle =
-      TextStyle(fontSize: 28, color: Colors.black38);
-  static const TextStyle gameOverTextStyle =
-      TextStyle(fontSize: 90, color: Colors.black38);
-
-  static void start(BuildContext context) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) {
-      return KidsGameScreen();
-    }));
-  }
+class UsernameScreen extends StatelessWidget {
+  static const int screenIndex = 1;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        if (!KidsCubit.of(context).focusNode.hasFocus) {
-          KidsCubit.of(context).focusNode.requestFocus();
-          print("Requested Focus");
-        }
-      },
-      child: Scaffold(
-        body: BlocBuilder<KidsCubit, KidsState>(
-            buildWhen: (previous, current) =>
-                current.secondsLeft == -1 ||
-                (previous.currentWord.isEmpty && current.currentWord.isNotEmpty) ||
-                (previous.secondsLeft == -1 && current.secondsLeft >= 60),
-            builder: (context, state) {
-              if (state.currentWord.isEmpty) {
-                return Center(
-                  child: Text(
-                    "Mache dich bereit!\nDas Spiel geht gleich los...",
-                    style: gameOverTextStyle,
-                    textAlign: TextAlign.center,
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+                width: 250,
+                child: TextField(
+                  controller: context.read<GameCubit>().usernameController,
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: "Benutzername",
                   ),
-                );
-              }
-      
-              if (state.secondsLeft == -1) {
-                return Center(
-                  child: Text(
-                    "Gut gemacht!\nDas Spiel ist vorbei :)",
-                    style: gameOverTextStyle,
-                    textAlign: TextAlign.center,
-                  ),
-                );
-              }
-      
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: BlocBuilder<KidsCubit, KidsState>(
-                        builder: (context, state) {
-                      return Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                              child: Text(
-                            "Punkte: ${state.points}",
-                            style: hudTextStyle,
-                          )),
-                          Expanded(
-                              child: Text(
-                            state.username,
-                            textAlign: TextAlign.center,
-                            style: hudTextStyle,
-                          )),
-                          Expanded(
-                              child: Text(
-                            "Verbleibende Zeit: ${state.secondsLeft}",
-                            textAlign: TextAlign.end,
-                            style: hudTextStyle,
-                          )),
-                        ],
-                      );
-                    }),
-                  ),
-                  Expanded(
-                      child: Center(
-                          child: KeyboardListener(
-                              focusNode: KidsCubit.of(context).focusNode,
-                              autofocus: true,
-                              onKeyEvent: (value) {
-                                String? char = value.character;
-                                if (char == null) return;
-                                KidsCubit.of(context).onKeyPressed(char);
-                              },
-                              child: BlocBuilder<KidsCubit, KidsState>(
-                                  buildWhen: (previous, current) =>
-                                      previous.currentWord !=
-                                          current.currentWord ||
-                                      previous.currentText != current.currentText,
-                                  builder: (context, state) => RichText(
-                                          text: TextSpan(
-                                              text: state.currentText,
-                                              style: TextStyle(
-                                                  fontSize: 160,
-                                                  color: Colors.green),
-                                              children: <TextSpan>[
-                                            TextSpan(
-                                                text: state.currentWord.substring(
-                                                    state.currentText.length),
-                                                style: TextStyle(
-                                                    fontSize: 160,
-                                                    color: Colors.black
-                                                        .withAlpha(100)))
-                                          ])))))),
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Text(
-                      "Schreibe das Wort oder den Satz!",
-                      style: hudTextStyle,
-                    ),
-                  )
-                ],
-              );
-            }),
+                )),
+            SizedBox(
+              height: 8,
+            ),
+            OutlinedButton(
+                onPressed: context.read<GameCubit>().saveUsername,
+                child: Text("Weiter"))
+          ],
+        ),
       ),
     );
   }
 }
 
-class AdminStartScreen extends StatefulWidget {
-  static void start(BuildContext context) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) {
-      return BlocProvider<AdminCubit>(
-          create: (_) => AdminCubit(
-              repository: RepositoryProvider.of<TalkRepository>(context)
-                ..becomeAdmin()),
-          child: AdminStartScreen());
-    }));
-  }
-
-  @override
-  State<AdminStartScreen> createState() => _AdminStartScreenState();
-}
-
-class _AdminStartScreenState extends State<AdminStartScreen> {
-
-  static const TextStyle _tableTextStyle = TextStyle(fontSize: 24);
-
-  final TextEditingController _minutesController = TextEditingController();
-  final TextEditingController _groupCountController =
-      TextEditingController(text: "2");
-
-  @override
-  void dispose() {
-    _minutesController.dispose();
-    super.dispose();
-  }
+class LobbyScreen extends StatelessWidget {
+  static const int screenIndex = 2;
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<AdminCubit, AdminState>(builder: (context, state) {
-      return Scaffold(
-        appBar: AppBar(
-          title: Text("Spielplan"),
+    return const Scaffold(
+      body: Center(
+          child: Text(
+        "Mach dich bereit!\nEs geht gleich los...",
+        style: TextStyle(fontSize: 72, color: Colors.black38),
+        textAlign: TextAlign.center,
+      )),
+    );
+  }
+}
+
+class GameScreen extends StatelessWidget {
+  static const int screenIndex = 3;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: DefaultTextStyle(
+        style: TextStyle(fontSize: 24, color: Colors.black38),
+        child: BlocBuilder<GameCubit, AppState>(
+          builder: (context, state) {
+            return Column(
+              children: [
+                Padding(
+                  padding: EdgeInsets.all(8.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(child: Text("Punkte: ${state.user!.points}")),
+                      Expanded(
+                          child: Text(
+                        state.user!.username,
+                        textAlign: TextAlign.center,
+                      )),
+                      Expanded(
+                          child: Text(
+                        state.secondsLeft.toString(),
+                        textAlign: TextAlign.right,
+                      ))
+                    ],
+                  ),
+                ),
+                Expanded(
+                    child: Center(
+                  child: KeyboardListener(
+                    focusNode: context.read<GameCubit>().focusNode
+                      ..requestFocus(),
+                    onKeyEvent: context.read<GameCubit>().enterCharacter,
+                    child: RichText(
+                      text: TextSpan(children: [
+                        TextSpan(
+                            text: state.typing,
+                            style:
+                                TextStyle(fontSize: 96, color: Colors.green)),
+                        TextSpan(
+                            text: state.game!.words[state.wordIndex]
+                                .substring(state.typing.length),
+                            style:
+                                TextStyle(fontSize: 96, color: Colors.black38)),
+                      ]),
+                    ),
+                  ),
+                )),
+                Padding(
+                  padding: EdgeInsets.all(8.0),
+                  child: Text(
+                      "Schreibe das Wort ab! Achte auf die Groß- und Kleinschreibung!"),
+                )
+              ],
+            );
+          },
         ),
-        body: Center(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+      ),
+    );
+  }
+}
+
+class GameOverScreen extends StatelessWidget {
+  static const int screenIndex = 4;
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(
+        child: Text(
+          "Game Over",
+          style: TextStyle(fontSize: 72, color: Colors.black38),
+        ),
+      ),
+    );
+  }
+}
+
+class GamePinPreviewScreen extends StatelessWidget {
+  static const int screenIndex = 5;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: BlocBuilder<GameCubit, AppState>(
+        builder: (context, state) {
+          return Center(
+            child: Column(
+              children: [
+                const Spacer(),
+                const Text("Der Game Pin lautet:",
+                    style: TextStyle(fontSize: 48, color: Colors.black38)),
+                Text(
+                  state.gameRoom!.pin.toString(),
+                  style: TextStyle(fontSize: 124),
+                ),
+                Expanded(
+                    flex: 2,
+                    child: Wrap(
+                      runAlignment: WrapAlignment.center,
+                      spacing: 8,
+                      runSpacing: 8,
                       children: [
-                        BlocBuilder<AdminCubit, AdminState>(
-                            buildWhen: (previous, current) =>
-                                previous.mode != current.mode,
-                            builder: (context, state) {
-                              return ToggleButtons(
-                                  onPressed: (v) {
-                                    AdminCubit.of(context)
-                                        .setGameMode(GameMode.values[v]);
-                                  },
-                                  children: [
-                                    Icon(Icons.person),
-                                    Icon(Icons.groups),
-                                    Icon(Icons.diversity_3),
-                                  ],
-                                  isSelected: [
-                                    state.mode == GameMode.single,
-                                    state.mode == GameMode.groups,
-                                    state.mode == GameMode.together,
-                                  ]);
-                            }),
+                        for (User user in state.gameRoom!.players)
+                          Chip(
+                              avatar: RandomAvatar(user.username,
+                                  height: 64, width: 64),
+                              label: Text(user.username)),
+                      ],
+                    )),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Checkbox(
+                        value: !state.gameRoom!.open,
+                        onChanged: (value) =>
+                            context.read<TeacherCubit>().closeRoom(value!)),
+                    Text("Diesen Raum für weitere Spieler schließen")
+                  ],
+                ),
+                const SizedBox(
+                  height: 8,
+                ),
+                OutlinedButton(
+                    onPressed: context.read<GameCubit>().goToTeacherScreen,
+                    child: const Text("Weiter")),
+                const SizedBox(
+                  height: 8,
+                )
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class TeacherScreen extends StatelessWidget {
+  static const int screenIndex = 6;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Column(
+          children: [
+            SizedBox(
+              height: 80,
+              child: BlocBuilder<GameCubit, AppState>(
+                builder: (context, appState) {
+                  return BlocBuilder<TeacherCubit, TeacherState>(
+                    builder: (context, teacherState) {
+                      return Card(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            ToggleButtons(
+                              children: [
+                                Tooltip(
+                                    message: "Einzelspieler",
+                                    child: Icon(Icons.person)),
+                                Tooltip(
+                                    message: "Teams",
+                                    child: Icon(Icons.groups)),
+                                Tooltip(
+                                    message: "Zusammen",
+                                    child: Icon(Icons.diversity_3)),
+                              ],
+                              isSelected: [
+                                for (int i = 0; i < 3; i++)
+                                  teacherState.gameMode == i
+                              ],
+                              onPressed:
+                                  context.read<TeacherCubit>().setGameMode,
+                            ),
+                            SizedBox(
+                                width: 250,
+                                child: TextField(
+                                  controller: context
+                                      .read<TeacherCubit>()
+                                      .minutesController,
+                                  decoration: InputDecoration(
+                                      border: OutlineInputBorder(),
+                                      labelText: "Spielzeit"),
+                                )),
+                            SizedBox(
+                                width: 250,
+                                child: TextField(
+                                  controller: context
+                                      .read<TeacherCubit>()
+                                      .teamsController,
+                                  onChanged:
+                                      context.read<TeacherCubit>().setTeamCount,
+                                  enabled: teacherState.gameMode == 1,
+                                  decoration: InputDecoration(
+                                      border: OutlineInputBorder(),
+                                      labelText: "Teams"),
+                                )),
+                            OutlinedButton.icon(
+                              onPressed: appState.secondsLeft > 0
+                                  ? null
+                                  : context.read<TeacherCubit>().resetPoints,
+                              icon: Icon(Icons.restart_alt),
+                              label: Text("Punkte zurücksetzten"),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+            BlocBuilder<TeacherCubit, TeacherState>(
+              buildWhen: (previous, current) =>
+                  previous.gameMode != current.gameMode,
+              builder: (context, state) {
+                return Expanded(
+                    child: switch (state.gameMode) {
+                  0 => SinglePlayerView(),
+                  1 => TeamPlayView(),
+                  _ => GroupView()
+                });
+              },
+            ),
+            SizedBox(
+              height: 80,
+              child: BlocBuilder<GameCubit, AppState>(
+                builder: (context, state) {
+                  return Card(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
                         SizedBox(
-                          width: 64,
+                          width: 200,
+                          child: OutlinedButton.icon(
+                              onPressed: () => context
+                                  .read<TeacherCubit>()
+                                  .closeRoom(state.gameRoom!.open),
+                              icon: Icon(state.gameRoom!.open
+                                  ? Icons.lock_open
+                                  : Icons.lock),
+                              label: Text(state.gameRoom!.open
+                                  ? "Offen"
+                                  : "Geschlossen")),
+                        ),
+                        Text(
+                          "Game Pin: ${state.gameRoom!.pin}",
+                          style: TextStyle(fontSize: 32),
                         ),
                         SizedBox(
-                          width: 260,
-                          child: TextField(
-                            controller: _minutesController,
-                            decoration: InputDecoration(
-                                border: OutlineInputBorder(),
-                                labelText: "Minuten"),
-                          ),
-                        ),
-                        SizedBox(
-                          width: 64,
-                        ),
-                        SizedBox(
-                          width: 260,
-                          child: TextField(
-                            controller: _groupCountController,
-                            onChanged: (value) {
-                              int? count = int.tryParse(value);
-                              if (count == null || count < 2) return;
-                              AdminCubit.of(context).setGroupCount(count);
-                            },
-                            decoration: InputDecoration(
-                                border: OutlineInputBorder(),
-                                labelText: "Gruppenanzahl"),
-                          ),
-                        ),
+                          width: 200,
+                          child: OutlinedButton.icon(
+                              onPressed: state.secondsLeft > 0
+                                  ? null
+                                  : context.read<TeacherCubit>().startGame,
+                              icon: Icon(state.secondsLeft > 0
+                                  ? Icons.timer
+                                  : Icons.play_arrow),
+                              label: Text(state.secondsLeft > 0
+                                  ? "Noch ${state.secondsLeft} Sekunden"
+                                  : "Spiel starten")),
+                        )
                       ],
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
-              Expanded(
-                child: BlocBuilder<AdminCubit, AdminState>(
-                    builder: (context, state) {
-                  if (state.players.isEmpty) {
-                    return Center(
-                      child: Text("Die Anmeldung kann losgehen :)"),
-                    );
-                  }
-
-                  if (state.mode == GameMode.single) {
-                    return Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text("Tabelle:", style: TextStyle(fontSize: 24)),
-                          Expanded(
-                              child: ListView.builder(
-                                  itemCount: state.players.length,
-                                  itemBuilder: (context, index) {
-                                    return SizedBox(
-                                      height: 50,
-                                      child: Row(
-                                        children: [
-                                          SizedBox(width: 24),
-                                          Text("${index + 1}.", style: _tableTextStyle,),
-                                          SizedBox(width: 16,),
-                                          Text("${state.players[index].username}", style: _tableTextStyle,),
-                                          Spacer(),
-                                          SizedBox(
-                                            width: 200, child: Text("Punkte: ${state.players[index].points}", style: _tableTextStyle,)),
-                                        ]
-                                        
-                                            
-                                      ),
-                                    );
-                                  })),
-                        ],
-                      ),
-                    );
-                  } else if (state.mode == GameMode.groups) {
-                    return Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Row(
-                        children: [
-                          Card(
-                            child: Padding(
-                              padding: const EdgeInsets.all(8),
-                              child: SizedBox(
-                                width: 200,
-                                child: ListView.builder(
-                                    itemCount: state.players.length,
-                                    itemBuilder: (context, index) {
-                                      return Draggable<Player>(
-                                        data: state.players[index],
-                                        child: ListTile(
-                                          tileColor: state.memberships[state.players[index].id] == null ? null : teams[state.memberships[state.players[index].id]!].withAlpha(150),
-                                          title: Text(
-                                              "${state.players[index].username}"),
-                                        ),
-                                        feedback:
-                                            Card(
-                                              child: Padding(
-                                                padding: const EdgeInsets.all(4),
-                                                child: SizedBox(
-                                                  height: 96,
-                                                  width: 96,
-                                                  child: Material(
-                                                    child: Column(
-                                                      mainAxisAlignment: MainAxisAlignment.center,
-                                                      children: [
-                                                        Icon(Icons.person, size: 48,),
-                                                        Text("${state.players[index].username}"),
-                                                      ],
-                                                    ),
-                                                  )),
-                                              ),
-                                            ),
-                                      );
-                                    }),
-                              ),
-                            ),
-                          ),
-                          Expanded(
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: [
-                                for (var i = 0; i < state.groupCount; i++)
-                                  DragTarget<Player>(
-                                      onAcceptWithDetails: (details) => AdminCubit.of(context).setGroupMembership(details.data, i),
-                                      builder: (context, players, _) {
-                      
-                                        List<Player> teamPlayers = state.players.where((element) => state.memberships[element.id] == i).toList();
-                                        int points = 0;
-                                        if (teamPlayers.isNotEmpty) {
-                                          points = teamPlayers.map((e) => e.points).reduce((value, element) => value + element);
-                                        }
-                      
-                                        return Container(
-                                            width: 200,
-                                            height: 100,
-                                            color: teams[i].withAlpha(150),
-                                            child: Center(child: Text("$points", style: TextStyle(fontSize: 48)),),
-                                          );
-                                      })
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  } else {
-                    return Center(
-                      child: Text(
-                        "Ihr habt ${state.players.map((e) => e.points).reduce((value, element) => value + element)} Punkte",
-                        style: TextStyle(fontSize: 64),
-                        textAlign: TextAlign.center,
-                      ),
-                    );
-                  }
-                }),
-              ),
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: SizedBox(
-                      width: 260,
-                      child: BlocBuilder<AdminCubit, AdminState>(
-                          builder: (context, state) {
-                        return OutlinedButton(
-                            onPressed: state.secondsLeft > 0
-                                ? null
-                                : () {
-                                    int? minutes =
-                                        int.tryParse(_minutesController.text);
-                                    if (minutes == null || minutes < 1) return;
-                                    AdminCubit.of(context).startGame(minutes);
-                                  },
-                            child: Text(state.secondsLeft > 0
-                                ? "Noch ${state.secondsLeft} Sekunden"
-                                : "Start"));
-                      })),
-                ),
-              )
-            ],
-          ),
+            )
+          ],
         ),
-      );
-    });
+      ),
+    );
   }
 }
 
-class TalkRepository {
-  final WebSocketChannel channel;
-  final Stream<Message> messageStream;
+class SinglePlayerView extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<GameCubit, AppState>(
+      builder: (context, state) {
+        List<User> players = state.gameRoom!.players;
+        players.sort((a, b) => b.points - a.points);
 
-  TalkRepository({required this.channel})
-      : messageStream = channel.stream
-            .map<Message>((event) => Message.fromJson(json.decode(event)))
-            .asBroadcastStream();
-
-            
-
-  void _send(MessageType type, Map<String, Object?> data) => channel.sink.add(
-      json.encode(Message(type: type.index, data: json.encode(data)).toJson()));
-
-  void register(String username) {
-    _send(
-        MessageType.registerReq, RegisterMessage(username: username).toJson());
-  }
-
-  void becomeAdmin() {
-    _send(MessageType.adminReq, {});
-  }
-
-  void scoredPoints(String id, int points) {
-    _send(MessageType.scoredPointsReq,
-        ScoredPointsMessage(id: id, points: points).toJson());
-  }
-
-  void startGame(int minutes) {
-    _send(MessageType.startGame, StartGameMessage(minutes: minutes).toJson());
+        return ListView.builder(
+            itemCount: players.length,
+            itemBuilder: (context, index) {
+              User user = players[index];
+              return ListTile(
+                leading: RandomAvatar(user.username),
+                title: Text(user.username),
+                subtitle: Text(user.points.toString()),
+              );
+            });
+      },
+    );
   }
 }
 
-class KidsCubit extends Cubit<KidsState> {
-  static KidsCubit of(BuildContext context) =>
-      BlocProvider.of<KidsCubit>(context);
+class TeamPlayView extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<TeacherCubit, TeacherState>(
+      builder: (context, teacherState) {
+        return BlocBuilder<GameCubit, AppState>(
+          builder: (context, appState) {
+            return Row(
+              children: [
+                Expanded(
+                  flex: 1,
+                  child: ListView.builder(
+                      itemCount: appState.gameRoom?.players.length ?? 0,
+                      itemBuilder: (context, index) {
+                        User user = appState.gameRoom!.players[index];
 
-  final TalkRepository _repository;
-  final List<String> _words = [];
-  final FocusNode focusNode = FocusNode();
+                        return Draggable(
+                          data: user,
+                          feedback: Material(
+                            child: Chip(
+                              avatar: RandomAvatar(user.username),
+                              label: Text(user.username),),
+                          ),
+                          child: ListTile(
+                            leading: RandomAvatar(user.username,
+                                width: 44, height: 44),
+                            title: Text(user.username),
+                            tileColor: teacherState.membership[user.id] == null ? null : TeacherCubit.teamColors[teacherState.membership[user.id]!].withAlpha(150),
+                          ),
+                        );
+                      }),
+                ),
+                SizedBox(width: 16),
+                Expanded(
+                    flex: 4,
+                    child: Wrap(
+                      alignment: WrapAlignment.center,
+                      runAlignment: WrapAlignment.center,
 
-  KidsCubit({required TalkRepository repository})
-      : _repository = repository,
-        super(KidsState.initialState) {
-    print("Kids listen");
-    repository.messageStream.listen(onMessage);
-  }
+                      children: [
+                        for (int i = 0; i < teacherState.teamCount; i++) Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: DragTarget<User>(
+                            onWillAcceptWithDetails: (_) => true,
+                            onAcceptWithDetails: (details) {
+                              context.read<TeacherCubit>().setMembership(details.data, i);
+                            },
+                            builder: (context, candidateData, rejectedData) {
+                              Iterable<User> users = appState.gameRoom!.players.where((element) => (teacherState.membership[element.id] ?? -1) == i);
 
-  void onMessage(Message msg) {
-    switch (MessageType.values[msg.type]) {
-      case MessageType.registerRes:
-        var res = RegisterResponseMessage.fromJson(json.decode(msg.data));
-        if (res.success) {
-          emit(state.copyWith(id: res.id, username: res.username));
-        }
-        break;
-
-      case MessageType.wordsRes:
-        var res = WordsMessage.fromJson(json.decode(msg.data));
-        _words.addAll(res.words);
-        emit(state.copyWith(
-            secondsLeft: res.minutes * 60, currentWord: _words.removeAt(0)));
-        _startTimer();
-        break;
-
-      default:
-        print("Kids - Unwanted Message received: ${msg.type}");
-    }
-  }
-
-  void _startTimer() {
-    Future.delayed(Duration(seconds: 1), () {
-      int secondsLeft = state.secondsLeft - 1;
-      emit(state.copyWith(secondsLeft: secondsLeft));
-      if (secondsLeft >= 0) {
-        _startTimer();
-      }
-    });
-  }
-
-  void setUsername(String username) {
-    _repository.register(username);
-  }
-
-  void onKeyPressed(String key) {
-    int nextIndex = state.currentText.length;
-    String nextChar = state.currentWord[nextIndex];
-    if (key == nextChar) {
-      String currentText = state.currentText;
-      currentText += key;
-
-      if (state.currentWord == currentText) {
-        _score();
-      } else {
-        emit(state.copyWith(currentText: currentText));
-      }
-    }
-  }
-
-  void _score() {
-    int points = state.currentWord.length * 100;
-    _repository.scoredPoints(state.id, points);
-    String nextWord = _words.removeAt(0);
-    emit(state.copyWith(
-        points: state.points + points, currentWord: nextWord, currentText: ""));
-  }
-}
-
-class AdminCubit extends Cubit<AdminState> {
-  static AdminCubit of(BuildContext context) =>
-      BlocProvider.of<AdminCubit>(context);
-
-  final TalkRepository _repository;
-
-  AdminCubit({required TalkRepository repository})
-      : _repository = repository,
-        super(AdminState.initialState) {
-    print("Admin Listen");
-    _repository.messageStream.listen(onMessage);
-  }
-
-  void onMessage(Message msg) {
-    switch (MessageType.values[msg.type]) {
-      case MessageType.overview:
-        var res = OverviewMessage.fromJson(json.decode(msg.data));
-        List<Player> players = List.from(res.players);
-        players.sort(
-          (a, b) => b.points - a.points,
+                              return Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                  height: 200,
+                                  width: 200,
+                                  color: TeacherCubit.teamColors[i].withAlpha(150),
+                                  child: Wrap(
+                                    alignment: WrapAlignment.center,
+                                    runAlignment: WrapAlignment.center,
+                                    runSpacing: 4,
+                                    spacing: 4,
+                                    children: [
+                                    for (User user in users) Chip(avatar: RandomAvatar(user.username), label: Text(user.username),)
+                                  ],),),
+                                  SizedBox(height: 8,),
+                                  Text(users.map((e) => e.points).sum.toString(), style: TextStyle(fontSize: 32, color: Colors.black38),)
+                                ],
+                              );
+                            },
+                            
+                          ),
+                        )
+                      ],
+                    ))
+              ],
+            );
+          },
         );
-
-        emit(state.copyWith(players: players));
-        break;
-
-      default:
-        print("Admin - Unwanted Message received: ${msg.type}");
-    }
+      },
+    );
   }
+}
 
-  void startGame(int minutes) {
-    _repository.startGame(minutes);
-    emit(state.copyWith(secondsLeft: minutes * 60));
-    _startTimer();
-  }
-
-  void setGameMode(GameMode mode) {
-    emit(state.copyWith(mode: mode));
-  }
-
-  void setGroupCount(int groupCount) {
-    if (groupCount < 2) return;
-    Map<String, int> memberships = Map.from(state.memberships);
-    memberships.removeWhere((key, value) => value >= groupCount);
-
-    emit(state.copyWith(groupCount: groupCount, memberships: memberships));
-  }
-
-  void setGroupMembership(Player player, int group) {
-    Map<String, int> memberships = Map.from(state.memberships);
-    memberships[player.id] = group;
-    emit(state.copyWith(memberships: memberships));
-  }
-
-  void _startTimer() {
-    Future.delayed(Duration(seconds: 1), () {
-      int secondsLeft = state.secondsLeft - 1;
-
-      if (secondsLeft >= 0) {
-        emit(state.copyWith(secondsLeft: secondsLeft));
-        _startTimer();
-      }
-    });
+class GroupView extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<GameCubit, AppState>(
+      builder: (context, state) {
+        return Center(
+          child: Text(
+            "Zusammen habt ihr ${state.gameRoom!.players.map((e) => e.points).sum} Punkte erreicht!",
+            style: const TextStyle(fontSize: 32, color: Colors.black38),
+          ),
+        );
+      },
+    );
   }
 }

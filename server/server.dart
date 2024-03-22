@@ -1,14 +1,20 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:shelf/shelf.dart';
-import 'package:shelf_router/shelf_router.dart';
 import 'package:shelf/shelf_io.dart';
 import 'package:shelf_web_socket/shelf_web_socket.dart';
 import 'package:typing_hero/types.dart';
+import 'package:typing_hero/types/closeroommessage.dart';
+import 'package:typing_hero/types/enterroommessage.dart';
+import 'package:typing_hero/types/errormessage.dart';
+import 'package:typing_hero/types/resetpointsmessage.dart';
+import 'package:typing_hero/types/saveusernamemessage.dart';
+import 'package:typing_hero/types/scorepointsmessage.dart';
+import 'package:typing_hero/types/startgamemessage.dart';
 import 'package:uuid/uuid.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
-import 'wordlist.dart';
 
 //const String ip = "10.16.30.108";
 const String ip = "localhost";
@@ -21,83 +27,210 @@ void main() async {
 }
 
 class GameServer {
+  late final FutureOr<Response> Function(Request) _handler;
 
-  WebSocketChannel? _admin = null;
-  final List<WebSocketChannel> _clients = [];
-  final List<Player> _players = [];
-  late FutureOr<Response> Function(Request) _handler;
+  final Random _random = Random();
+  final Map<String, WebSocketChannel?> connections = {};
+  final List<GameRoom> rooms = [];
 
   GameServer() {
     _handler = webSocketHandler(_onNewConnection);
   }
   
-  void _onNewConnection(WebSocketChannel client) {
-    _clients.add(client);
-    client.stream.listen((event) {
-      Message msg = Message.fromJson(json.decode(event));
-      _onMessage(client, msg);
-    }, onError: (event) {
-      print("Error with $client on $event");
-    }, onDone: () {
-      print("Done with client: $client");
-    });
-    
-  }
-
-  void _onMessage(WebSocketChannel client, Message message) {
-
-    switch (MessageType.values[message.type]) {
-      case MessageType.registerReq:
-        var req = RegisterMessage.fromJson(json.decode(message.data));
-        print(req);
-
-        if (_players.any((element) => element.username == req.username)) {
-          client.sink.add(json.encode(Message(type: MessageType.registerRes.index, data: json.encode(RegisterResponseMessage(success: false, id: "", username: "").toJson()))));
-        } else {
-          String uuid = Uuid().v4();
-          client.sink.add(json.encode(Message(type: MessageType.registerRes.index, data: json.encode(RegisterResponseMessage(success: true, id: uuid, username: req.username).toJson()))));
-          _players.add(Player(id: uuid, username: req.username, points: 0));
-        }
-        break;
-      
-      case MessageType.scoredPointsReq:
-        var req = ScoredPointsMessage.fromJson(json.decode(message.data));
-        print(req);
-
-        int index = _players.indexWhere((element) => element.id == req.id);
-        
-        Player p = _players.removeAt(index);
-        p = p.copyWith(points: p.points + req.points);
-        _players.add(p);
-        break;
-      
-      case MessageType.adminReq:
-        print("Become Admin");
-        _admin = client;
-        break;
-      
-      case MessageType.startGame:
-        var req = StartGameMessage.fromJson(json.decode(message.data));
-        print(req);
-
-        var randomWords = List<String>.from(words);
-        randomWords.shuffle();
-        var res = WordsMessage(words: randomWords, minutes: req.minutes);
-        for (var c in _clients) {
-          c.sink.add(json.encode(Message(type: MessageType.wordsRes.index, data: json.encode(res.toJson())).toJson()));
-        }
-        break;
-      
-      default:
-        print("Server - Unwanted Message: ${message.type}");
+  int _getRandomRoomPin() {
+    int pin;
+    do {
+      pin = _random.nextInt(899999) + 100000;
     }
+    while (rooms.any((room) => room.pin == pin));
 
-    _sendOverview();
+    return pin;
   }
 
-  void _sendOverview() {
-    if (_admin == null) return;
-    _admin?.sink.add(json.encode(Message(type: MessageType.overview.index, data: json.encode(OverviewMessage(players: _players).toJson())).toJson()));
+  void _onNewConnection(WebSocketChannel client) {
+    String id = const Uuid().v4();
+    connections[id] = client;
+
+    client.stream.listen(
+      (message) => _onMessage(id, message),
+      onDone: () => _onConnectionClosed(id)
+      );
+  }
+
+  void _onConnectionClosed(String id) {
+    connections[id] = null;
+  }
+
+  void _send(String userId, Type type, Map<String, Object?> json) {
+
+    WebSocketChannel? client = connections[userId];
+    if (client == null) return;
+
+    json["type"] = type.toString();
+    client.sink.add(jsonEncode(json));
+  }
+
+  void _sendUnauthorizedError(String userId, {String tag = ""}) {
+    _send(userId, ErrorMessage, ErrorMessage(message: "$tag: Unautorisierter Zugriff").toJson());
+  }
+
+  void _sendRoomNotFound(String userId, {String tag = ""}) {
+        _send(userId, ErrorMessage, ErrorMessage(message: "$tag: Raum nicht gefunden").toJson());
+  }
+
+  Future<void> _onMessage(String userId, dynamic message) async {
+    
+    Map<String, Object?> json = jsonDecode(message);
+    String? type = json["type"] as String?;
+    if (type == null) return;
+
+    switch (type) {
+      case "EnterRoomMessage":
+        EnterRoomMessage req = EnterRoomMessage.fromJson(json);
+
+        // find room
+        int index = rooms.indexWhere((room) => room.pin == req.pin);
+        if (index == -1) {
+          _send(userId, ErrorMessage, ErrorMessage(message: "Der Game Pin ${req.pin} ist ungültig!").toJson());
+          return;
+        }
+
+        // room is closed
+        if (!rooms[index].open) {
+          _send(userId, ErrorMessage, ErrorMessage(message: "Der Raum ist schon geschlossen!").toJson());
+          return;
+        }
+
+        
+        User user = User(id: userId, username: "Spieler ${rooms[index].players.length + 1}", points: 0, gameRoomPin: req.pin);
+        rooms[index].players.add(user);
+
+        _send(userId, User, user.toJson());
+        _send(rooms[index].ownerId, GameRoom, rooms[index].toJson());
+
+        // send game to new player
+        if (rooms[index].game != null) {
+          _send(userId, Game, rooms[index].game!.toJson());
+        }
+
+      case "SaveUsernameMessage":
+        SaveUsernameMessage req = SaveUsernameMessage.fromJson(json);
+
+        int roomIndex = rooms.indexWhere((room) => room.pin == req.pin);
+        if (roomIndex == -1) {
+          _sendRoomNotFound(userId, tag: "SaveUsernameMessage");
+          return;
+        }
+
+        if (rooms[roomIndex].players.any((player) => player.id != userId && player.username == req.username) || req.username.startsWith("Spieler")) {
+          _send(userId, ErrorMessage, ErrorMessage(message: "Der Benutzername ist schon vergeben!").toJson());
+          return;
+        }
+
+        int userIndex = rooms[roomIndex].players.indexWhere((user) => user.id == userId);
+        if (userIndex == -1) {
+          _send(userId, ErrorMessage, ErrorMessage(message: "Konnte den Benutzernamen nicht speichern! Grund: Benutzer-ID ungültig").toJson());
+          return;
+        }
+
+        
+        rooms[roomIndex].players[userIndex].username = req.username;
+        
+        _send(userId, User, rooms[roomIndex].players[userIndex].toJson());
+        _send(rooms[roomIndex].ownerId, GameRoom, rooms[roomIndex].toJson());
+
+      case "ScorePointsMessage":
+        ScorePointsMessage req = ScorePointsMessage.fromJson(json);
+        
+        int roomIndex = rooms.indexWhere((element) => element.pin == req.pin);
+        if (roomIndex == -1) {
+          _sendRoomNotFound(userId, tag: "ScorePointsMessage");
+          return;
+        }
+
+        int playerIndex = rooms[roomIndex].players.indexWhere((element) => element.id == userId);
+        if (playerIndex == -1) {
+          _send(userId, ErrorMessage, ErrorMessage(message: "ScorePointsMessage: Ungültige UserID").toJson());
+          return;
+        }
+
+        rooms[roomIndex].players[playerIndex].points = rooms[roomIndex].players[playerIndex].points + req.points;
+
+        _send(rooms[roomIndex].ownerId, GameRoom, rooms[roomIndex].toJson());
+        _send(userId, User, rooms[roomIndex].players[playerIndex].toJson());
+
+      case "CreateRoomMessage":
+        GameRoom room = GameRoom(ownerId: userId, pin: _getRandomRoomPin(), open: true, players: [], game: null);
+        rooms.add(room);
+        _send(userId, GameRoom, room.toJson());
+
+      case "CloseRoomMessage":
+        CloseRoomMessage req = CloseRoomMessage.fromJson(json);
+
+        // find and update room
+        int index = rooms.indexWhere((room) => room.pin == req.pin && room.ownerId == userId);
+        if (index == -1) {
+          _sendRoomNotFound(userId, tag: "CloseRoomMessage");
+          return;
+        }
+
+        rooms[index].open = !req.closed;
+
+        // update teacher
+        _send(userId, GameRoom, rooms[index].toJson());
+
+      case "StartGameMessage":
+        StartGameMessage req = StartGameMessage.fromJson(json);
+
+        // find room
+        int roomIndex = rooms.indexWhere((element) => element.pin == req.pin);
+        if (roomIndex == -1) {
+          _sendRoomNotFound(userId, tag: "StartGameMessage");
+          return;
+        }
+
+        // requesting client is not the room owner
+        if (rooms[roomIndex].ownerId != userId) {
+          _sendUnauthorizedError(userId, tag: "StartGameMessage");
+          return;
+        }
+
+        rooms[roomIndex].game = req.game;
+
+        // send game to teacher and client
+        _send(rooms[roomIndex].ownerId, GameRoom, rooms[roomIndex].toJson());
+        for (User user in rooms[roomIndex].players) {
+          _send(user.id, Game, req.game.toJson());
+        }
+
+      case "ResetPointsMessage":
+        ResetPointsMessage req = ResetPointsMessage.fromJson(json);
+
+        // find room
+        int roomIndex = rooms.indexWhere((element) => element.pin == req.pin);
+        if (roomIndex == -1) {
+          _sendRoomNotFound(userId, tag: "ResetPointsMessage");
+          return;
+        }
+
+        // requesting client is not the room owner
+        if (rooms[roomIndex].ownerId != userId) {
+          _sendUnauthorizedError(userId, tag: "ResetPointsMessage");
+          return;
+        }
+
+        for (int i = 0; i < rooms[roomIndex].players.length; i++) {
+          rooms[roomIndex].players[i].points = 0;
+          _send(rooms[roomIndex].players[i].id, User, rooms[roomIndex].players[i].toJson());
+        }
+
+        _send(rooms[roomIndex].ownerId, GameRoom, rooms[roomIndex].toJson());
+
+      default:
+        print("[!] Unknown Message: $json");
+    }
+    
+
   }
 
   void run() {

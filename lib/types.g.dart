@@ -6,107 +6,98 @@ part of 'types.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_$PlayerImpl _$$PlayerImplFromJson(Map<String, dynamic> json) => _$PlayerImpl(
-      id: json['id'] as String,
-      username: json['username'] as String,
-      points: json['points'] as int,
-    );
-
-Map<String, dynamic> _$$PlayerImplToJson(_$PlayerImpl instance) =>
-    <String, dynamic>{
-      'id': instance.id,
-      'username': instance.username,
-      'points': instance.points,
-    };
-
-_$MessageImpl _$$MessageImplFromJson(Map<String, dynamic> json) =>
-    _$MessageImpl(
-      type: json['type'] as int,
-      data: json['data'] as String,
-    );
-
-Map<String, dynamic> _$$MessageImplToJson(_$MessageImpl instance) =>
-    <String, dynamic>{
-      'type': instance.type,
-      'data': instance.data,
-    };
-
-_$RegisterMessageImpl _$$RegisterMessageImplFromJson(
-        Map<String, dynamic> json) =>
-    _$RegisterMessageImpl(
-      username: json['username'] as String,
-    );
-
-Map<String, dynamic> _$$RegisterMessageImplToJson(
-        _$RegisterMessageImpl instance) =>
-    <String, dynamic>{
-      'username': instance.username,
-    };
-
-_$RegisterResponseMessageImpl _$$RegisterResponseMessageImplFromJson(
-        Map<String, dynamic> json) =>
-    _$RegisterResponseMessageImpl(
-      success: json['success'] as bool,
-      id: json['id'] as String,
-      username: json['username'] as String,
-    );
-
-Map<String, dynamic> _$$RegisterResponseMessageImplToJson(
-        _$RegisterResponseMessageImpl instance) =>
-    <String, dynamic>{
-      'success': instance.success,
-      'id': instance.id,
-      'username': instance.username,
-    };
-
-_$ScoredPointsMessageImpl _$$ScoredPointsMessageImplFromJson(
-        Map<String, dynamic> json) =>
-    _$ScoredPointsMessageImpl(
-      id: json['id'] as String,
-      points: json['points'] as int,
-    );
-
-Map<String, dynamic> _$$ScoredPointsMessageImplToJson(
-        _$ScoredPointsMessageImpl instance) =>
-    <String, dynamic>{
-      'id': instance.id,
-      'points': instance.points,
-    };
-
-_$WordsMessageImpl _$$WordsMessageImplFromJson(Map<String, dynamic> json) =>
-    _$WordsMessageImpl(
-      words: (json['words'] as List<dynamic>).map((e) => e as String).toList(),
-      minutes: json['minutes'] as int,
-    );
-
-Map<String, dynamic> _$$WordsMessageImplToJson(_$WordsMessageImpl instance) =>
-    <String, dynamic>{
-      'words': instance.words,
-      'minutes': instance.minutes,
-    };
-
-_$StartGameMessageImpl _$$StartGameMessageImplFromJson(
-        Map<String, dynamic> json) =>
-    _$StartGameMessageImpl(
-      minutes: json['minutes'] as int,
-    );
-
-Map<String, dynamic> _$$StartGameMessageImplToJson(
-        _$StartGameMessageImpl instance) =>
-    <String, dynamic>{
-      'minutes': instance.minutes,
-    };
-
-_$OverviewMessageImpl _$$OverviewMessageImplFromJson(
-        Map<String, dynamic> json) =>
-    _$OverviewMessageImpl(
+_$GameRoomImpl _$$GameRoomImplFromJson(Map<String, dynamic> json) =>
+    _$GameRoomImpl(
+      ownerId: json['ownerId'] as String,
+      pin: json['pin'] as int,
+      open: json['open'] as bool,
       players: (json['players'] as List<dynamic>)
-          .map((e) => Player.fromJson(e as Map<String, dynamic>))
+          .map((e) => User.fromJson(e as Map<String, dynamic>))
           .toList(),
+      game: json['game'] == null
+          ? null
+          : Game.fromJson(json['game'] as Map<String, dynamic>),
     );
 
-Map<String, dynamic> _$$OverviewMessageImplToJson(
-        _$OverviewMessageImpl instance) =>
+Map<String, dynamic> _$$GameRoomImplToJson(_$GameRoomImpl instance) =>
     <String, dynamic>{
+      'ownerId': instance.ownerId,
+      'pin': instance.pin,
+      'open': instance.open,
       'players': instance.players,
+      'game': instance.game,
+    };
+
+_$GameImpl _$$GameImplFromJson(Map<String, dynamic> json) => _$GameImpl(
+      id: json['id'] as String,
+      words: (json['words'] as List<dynamic>).map((e) => e as String).toList(),
+      startTime: json['startTime'] as int,
+      endTime: json['endTime'] as int,
+    );
+
+Map<String, dynamic> _$$GameImplToJson(_$GameImpl instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'words': instance.words,
+      'startTime': instance.startTime,
+      'endTime': instance.endTime,
+    };
+
+_$UserImpl _$$UserImplFromJson(Map<String, dynamic> json) => _$UserImpl(
+      id: json['id'] as String,
+      username: json['username'] as String,
+      points: json['points'] as int,
+      gameRoomPin: json['gameRoomPin'] as int,
+    );
+
+Map<String, dynamic> _$$UserImplToJson(_$UserImpl instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'username': instance.username,
+      'points': instance.points,
+      'gameRoomPin': instance.gameRoomPin,
+    };
+
+_$AppStateImpl _$$AppStateImplFromJson(Map<String, dynamic> json) =>
+    _$AppStateImpl(
+      currentScreen: json['currentScreen'] as int,
+      error: json['error'] as String,
+      wordIndex: json['wordIndex'] as int,
+      typing: json['typing'] as String,
+      secondsLeft: json['secondsLeft'] as int,
+      user: json['user'] == null
+          ? null
+          : User.fromJson(json['user'] as Map<String, dynamic>),
+      game: json['game'] == null
+          ? null
+          : Game.fromJson(json['game'] as Map<String, dynamic>),
+      gameRoom: json['gameRoom'] == null
+          ? null
+          : GameRoom.fromJson(json['gameRoom'] as Map<String, dynamic>),
+    );
+
+Map<String, dynamic> _$$AppStateImplToJson(_$AppStateImpl instance) =>
+    <String, dynamic>{
+      'currentScreen': instance.currentScreen,
+      'error': instance.error,
+      'wordIndex': instance.wordIndex,
+      'typing': instance.typing,
+      'secondsLeft': instance.secondsLeft,
+      'user': instance.user,
+      'game': instance.game,
+      'gameRoom': instance.gameRoom,
+    };
+
+_$TeacherStateImpl _$$TeacherStateImplFromJson(Map<String, dynamic> json) =>
+    _$TeacherStateImpl(
+      gameMode: json['gameMode'] as int,
+      teamCount: json['teamCount'] as int,
+      membership: Map<String, int>.from(json['membership'] as Map),
+    );
+
+Map<String, dynamic> _$$TeacherStateImplToJson(_$TeacherStateImpl instance) =>
+    <String, dynamic>{
+      'gameMode': instance.gameMode,
+      'teamCount': instance.teamCount,
+      'membership': instance.membership,
     };
