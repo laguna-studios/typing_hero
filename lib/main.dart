@@ -8,9 +8,12 @@ import 'package:typing_hero/game_repository.dart';
 import 'package:typing_hero/types.dart';
 import 'package:collection/collection.dart';
 
-void main() {
+Future<void> main() async {
+  // setup for hydrated cubit
+  WidgetsFlutterBinding.ensureInitialized();
+
   runApp(TypingApp(
-    gameRepository: GameRepository(hostname: "10.16.107.114", port: 9999),
+    gameRepository: GameRepository(hostname: "192.168.43.49", port: 9999),
   ));
 }
 
@@ -35,11 +38,11 @@ class TypingApp extends StatelessWidget {
           ),
         ],
         child: MaterialApp(
-          home: BlocListener<GameCubit, AppState>(
-            listenWhen: (previous, current) =>
+          home: BlocBuilder<GameCubit, AppState>(
+            buildWhen: (previous, current) =>
                 previous.currentScreen != current.currentScreen,
-            listener: (context, state) {
-              Navigator.of(context).push(MaterialPageRoute(builder: (_) {
+            builder: (context, state)
+              {
                 return switch (state.currentScreen) {
                   UsernameScreen.screenIndex => UsernameScreen(),
                   GamePinPreviewScreen.screenIndex => GamePinPreviewScreen(),
@@ -49,9 +52,9 @@ class TypingApp extends StatelessWidget {
                   GameOverScreen.screenIndex => GameOverScreen(),
                   _ => GamePinScreen(),
                 };
-              }));
-            },
-            child: GamePinScreen(),
+              }
+              
+            ,
           ),
         ),
       ),
@@ -463,10 +466,14 @@ class SinglePlayerView extends StatelessWidget {
             itemCount: players.length,
             itemBuilder: (context, index) {
               User user = players[index];
-              return ListTile(
-                leading: RandomAvatar(user.username),
-                title: Text(user.username),
-                subtitle: Text(user.points.toString()),
+              return Dismissible(
+                key: ValueKey(user.id),
+                onDismissed: (_) => context.read<TeacherCubit>().removePlayer(user),
+                child: ListTile(
+                  leading: RandomAvatar(user.username),
+                  title: Text(user.username),
+                  subtitle: Text(user.points.toString()),
+                ),
               );
             });
       },

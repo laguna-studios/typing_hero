@@ -8,7 +8,7 @@ import 'package:typing_hero/types.dart';
 
 class GameCubit extends Cubit<AppState> {
   static const AppState initialState = AppState(
-      currentScreen: 0,
+      currentScreen: GamePinScreen.screenIndex,
       error: "",
       wordIndex: 0,
       typing: "",
@@ -197,4 +197,5 @@ class GameCubit extends Cubit<AppState> {
       emit(state.copyWith(typing: typing));
     }
   }
+
 }

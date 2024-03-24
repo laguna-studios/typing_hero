@@ -52,7 +52,7 @@ class AppState with _$AppState {
 
     required User? user,
     required Game? game,
-    required GameRoom? gameRoom,
+    required GameRoom? gameRoom
   }) = _AppState;
 
   factory AppState.fromJson(Map<String, Object?> json) => _$AppStateFromJson(json);

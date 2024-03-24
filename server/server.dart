@@ -9,6 +9,8 @@ import 'package:typing_hero/types.dart';
 import 'package:typing_hero/types/closeroommessage.dart';
 import 'package:typing_hero/types/enterroommessage.dart';
 import 'package:typing_hero/types/errormessage.dart';
+import 'package:typing_hero/types/reconnectmessage.dart';
+import 'package:typing_hero/types/removeplayermessage.dart';
 import 'package:typing_hero/types/resetpointsmessage.dart';
 import 'package:typing_hero/types/saveusernamemessage.dart';
 import 'package:typing_hero/types/scorepointsmessage.dart';
@@ -16,13 +18,11 @@ import 'package:typing_hero/types/startgamemessage.dart';
 import 'package:uuid/uuid.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-const String ip = "10.16.107.114";
+const String ip = "192.168.43.49";
 
 void main() async {
-
   GameServer server = GameServer();
   server.run();
-
 }
 
 class GameServer {
@@ -39,7 +39,7 @@ class GameServer {
   int _getRandomRoomPin() {
     int pin;
     do {
-      pin = _random.nextInt(899999) + 100000;
+      pin = _random.nextInt(899) + 100;
     }
     while (rooms.any((room) => room.pin == pin));
 
@@ -78,7 +78,6 @@ class GameServer {
   }
 
   Future<void> _onMessage(String userId, dynamic message) async {
-    
     Map<String, Object?> json = jsonDecode(message);
     String? type = json["type"] as String?;
     if (type == null) return;
@@ -97,6 +96,12 @@ class GameServer {
         // room is closed
         if (!rooms[index].open) {
           _send(userId, "ErrorMessage", ErrorMessage(message: "Der Raum ist schon geschlossen!").toJson());
+          return;
+        }
+
+        // user with id already exists
+        if (rooms[index].players.any((element) => element.id == userId)) {
+          _send(userId, "ErrorMessage", ErrorMessage(message: "Du bist schon im Raum!").toJson());
           return;
         }
 
@@ -121,17 +126,19 @@ class GameServer {
           return;
         }
 
-        if (rooms[roomIndex].players.any((player) => player.id != userId && player.username == req.username) || req.username.startsWith("Spieler")) {
-          _send(userId, "ErrorMessage", ErrorMessage(message: "Der Benutzername ist schon vergeben!").toJson());
-          return;
-        }
-
         int userIndex = rooms[roomIndex].players.indexWhere((user) => user.id == userId);
         if (userIndex == -1) {
           _send(userId, "ErrorMessage", ErrorMessage(message: "Konnte den Benutzernamen nicht speichern! Grund: Benutzer-ID ungültig").toJson());
           return;
         }
 
+        // check for duplicate username
+        if (rooms[roomIndex].players[userIndex].username != req.username) {
+          if (rooms[roomIndex].players.any((player) => player.id != userId && player.username == req.username) || req.username.startsWith("Spieler") ) {
+          _send(userId, "ErrorMessage", ErrorMessage(message: "Der Benutzername ist schon vergeben!").toJson());
+          return;
+        }
+        }
         
         rooms[roomIndex].players[userIndex].username = req.username;
         
@@ -225,15 +232,91 @@ class GameServer {
 
         _send(rooms[roomIndex].ownerId, "GameRoom", rooms[roomIndex].toJson());
 
+      case "ReconnectMessage":
+        ReconnectMessage req = ReconnectMessage.fromJson(json);
+
+        // user doesn't exist
+        if (!connections.containsKey(req.oldUserId)) {
+          _send(userId, "ErrorMessage", ErrorMessage(message: "ReconnectMessage: Alte User ID ist ungültig").toJson());
+          return;
+        }
+
+        // room doesnt exist
+        int roomIndex = rooms.indexWhere((element) => element.pin == req.pin);
+        if (roomIndex == -1) {
+          _sendRoomNotFound(userId, tag: "ReconnectMessage");
+          return;
+        }
+
+        // reconnect teacher
+        if (req.teacher) {
+          // old user is room owner
+          if (rooms[roomIndex].ownerId != req.oldUserId) {
+            _sendUnauthorizedError(userId, tag: "ReconnectMessage");
+            return;
+          }
+
+          // set new user id for room
+          rooms[roomIndex].ownerId = userId;
+        }
+
+        // reconnect player
+        else {
+          // player doesnt exist
+          int playerIndex = rooms[roomIndex].players.indexWhere((element) => element.id == req.oldUserId);
+          if (playerIndex == -1) {
+            _send(userId, "ErrorMessage", ErrorMessage(message: "ReconnectMessage: Spieler nicht im Raum gefunden").toJson());
+            return;
+          }
+
+          // set new user id
+          rooms[roomIndex].players[playerIndex].id = userId;
+
+          // send user info back to player
+          _send(req.oldUserId, "User", rooms[roomIndex].players[playerIndex].toJson());
+        }
+
+        // remove old connection
+        connections.remove(req.oldUserId);
+        
+        // send room info to teacher
+        _send(rooms[roomIndex].ownerId, "GameRoom", rooms[roomIndex].toJson());
+
+      case "RemovePlayerMessage":
+        RemovePlayerMessage req = RemovePlayerMessage.fromJson(json);
+
+        // find room
+        int roomIndex = rooms.indexWhere((element) => element.pin == req.pin);
+        if (roomIndex == -1) {
+          _sendRoomNotFound(userId, tag: "RemovePlayerMessage");
+          return;
+        }
+
+        // requesting client is not the room owner
+        if (rooms[roomIndex].ownerId != userId) {
+          _sendUnauthorizedError(userId, tag: "RemovePlayerMessage");
+          return;
+        }
+
+        // find player
+        int playerIndex = rooms[roomIndex].players.indexWhere((element) => element.id == req.userId);
+        if (playerIndex == -1) {
+          _send(userId, "ErrorMessage", ErrorMessage(message: "RemovePlayerMessage: Spieler nicht im Raum gefunden").toJson());
+          return;
+        }
+
+        // remove player
+        rooms[roomIndex].players.removeAt(playerIndex);
+
+        // send room info to teacher
+        _send(rooms[roomIndex].ownerId, "GameRoom", rooms[roomIndex].toJson());
+
       default:
         print("[!] Unknown Message: $json");
     }
-    
-
   }
 
   void run() {
     serve(_handler, ip, 9999);
   }
-
 }

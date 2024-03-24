@@ -75,4 +75,12 @@ class TeacherCubit extends Cubit<TeacherState> {
     membership[user.id] = team;
     emit(state.copyWith(membership: membership));
   }
+
+  void removePlayer(User user) {
+    gameRepository.removePlayer(user.id);
+
+    Map<String, int> membership = Map.from(state.membership);
+    membership.remove(user.id);
+    emit(state.copyWith(membership: membership));
+  }
 }
