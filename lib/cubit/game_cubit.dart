@@ -1,12 +1,12 @@
 import 'dart:async';
 
-import 'package:bloc/bloc.dart';
 import 'package:flutter/material.dart';
+import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'package:typing_hero/game_repository.dart';
 import 'package:typing_hero/main.dart';
 import 'package:typing_hero/types.dart';
 
-class GameCubit extends Cubit<AppState> {
+class GameCubit extends HydratedCubit<AppState> {
   static const AppState initialState = AppState(
       currentScreen: GamePinScreen.screenIndex,
       error: "",
@@ -154,6 +154,50 @@ class GameCubit extends Cubit<AppState> {
     }
   }
 
+  // check for page reload
+  void checkPageReload() {
+    if (state.user != null) {
+      _checkPageReloadPlayer();
+    } else if (state.gameRoom != null) {
+      _checkPageReloadTeacher();
+    }
+  }
+
+  void _checkPageReloadTeacher() {
+    gameRepository.setConnectionInfo(state.gameRoom!.ownerId, state.gameRoom!.pin, true);
+
+    // no game started yet
+    if (state.gameRoom!.game == null) {
+      return;
+    }
+
+    // calculate seconds left
+    int secondsLeft = (state.gameRoom!.game!.endTime - DateTime.now().millisecondsSinceEpoch) ~/ 1000;
+    if (secondsLeft > 0) {
+      emit(state.copyWith(secondsLeft: secondsLeft));
+      _decreaseTimer(gameOverOnZero: false);
+    } else {
+      emit(state.copyWith(secondsLeft: 0));
+    }
+  }
+
+  void _checkPageReloadPlayer() {
+    gameRepository.setConnectionInfo(state.user!.id, state.user!.gameRoomPin, false);
+
+    // check if game is available
+    if (state.game == null) {
+      return;
+    }
+
+    int secondsLeft = (state.game!.endTime - DateTime.now().millisecondsSinceEpoch) ~/ 1000;
+    if (secondsLeft > 0) {
+      emit(state.copyWith(secondsLeft: secondsLeft));
+      _decreaseTimer();
+    } else {
+      emit(state.copyWith(secondsLeft: 0, currentScreen: GameOverScreen.screenIndex));
+    }
+  }
+
   void createRoom() {
     gameRepository.createRoom();
   }
@@ -196,6 +240,16 @@ class GameCubit extends Cubit<AppState> {
     else {
       emit(state.copyWith(typing: typing));
     }
+  }
+  
+  @override
+  AppState? fromJson(Map<String, dynamic> json) {
+    return AppState.fromJson(json);
+  }
+  
+  @override
+  Map<String, dynamic>? toJson(AppState state) {
+    return state.toJson();
   }
 
 }

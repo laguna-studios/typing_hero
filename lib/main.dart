@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'package:random_avatar/random_avatar.dart';
 import 'package:typing_hero/cubit/game_cubit.dart';
 import 'package:typing_hero/cubit/teacher_cubit.dart';
@@ -11,6 +12,8 @@ import 'package:collection/collection.dart';
 Future<void> main() async {
   // setup for hydrated cubit
   WidgetsFlutterBinding.ensureInitialized();
+  HydratedBloc.storage = await HydratedStorage.build(storageDirectory: HydratedStorage.webStorageDirectory);
+
 
   runApp(TypingApp(
     gameRepository: GameRepository(hostname: "192.168.43.49", port: 9999),
@@ -30,7 +33,7 @@ class TypingApp extends StatelessWidget {
         providers: [
           BlocProvider<GameCubit>(
             create: (context) => GameCubit(GameCubit.initialState,
-                gameRepository: gameRepository),
+                gameRepository: gameRepository)..checkPageReload(),
           ),
           BlocProvider<TeacherCubit>(
             create: (context) => TeacherCubit(TeacherCubit.initialState,

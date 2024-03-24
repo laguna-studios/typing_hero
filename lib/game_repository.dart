@@ -102,6 +102,13 @@ class GameRepository {
     _send("ReconnectMessage", ReconnectMessage(pin: _gameRoomPin!, oldUserId: _userId!, teacher: true).toJson());
   }
 
+  // Set user id and game room pin
+  void setConnectionInfo(String userId, int gameRoomPin, bool teacher) {
+    _userId = userId;
+    _gameRoomPin = gameRoomPin;
+    _send("ReconnectMessage", ReconnectMessage(pin: _gameRoomPin!, oldUserId: _userId!, teacher: teacher).toJson());
+  }
+
   // Connection monitoring
   void _onDataReceived(dynamic message) {
     Map<String, Object?> json = jsonDecode(message);

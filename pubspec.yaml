@@ -44,6 +44,7 @@ dependencies:
   flutter_bloc: ^8.1.4
   uuid: ^4.3.3
   random_avatar: ^0.0.8
+  hydrated_bloc: ^9.1.4
 
 dev_dependencies:
   flutter_test:

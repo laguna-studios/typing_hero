@@ -274,6 +274,10 @@ class GameServer {
 
           // send user info back to player
           _send(req.oldUserId, "User", rooms[roomIndex].players[playerIndex].toJson());
+
+          if (rooms[roomIndex].game != null) {
+            _send(req.oldUserId, "Game", rooms[roomIndex].game!.toJson());
+          }
         }
 
         // remove old connection

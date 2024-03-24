@@ -1,14 +1,14 @@
 import 'dart:math';
 
-import 'package:bloc/bloc.dart';
 import 'package:flutter/material.dart';
+import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'package:typing_hero/game_repository.dart';
 import 'package:typing_hero/types.dart';
 import 'package:uuid/uuid.dart';
 
 import '../types/wordlist.dart';
 
-class TeacherCubit extends Cubit<TeacherState> {
+class TeacherCubit extends HydratedCubit<TeacherState> {
 
   static const teamColors = [
     Colors.red,
@@ -82,5 +82,15 @@ class TeacherCubit extends Cubit<TeacherState> {
     Map<String, int> membership = Map.from(state.membership);
     membership.remove(user.id);
     emit(state.copyWith(membership: membership));
+  }
+  
+  @override
+  TeacherState? fromJson(Map<String, dynamic> json) {
+    return TeacherState.fromJson(json);
+  }
+  
+  @override
+  Map<String, dynamic>? toJson(TeacherState state) {
+    return state.toJson();
   }
 }
