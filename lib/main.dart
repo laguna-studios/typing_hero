@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
@@ -17,7 +16,7 @@ Future<void> main() async {
       storageDirectory: HydratedStorage.webStorageDirectory);
 
   runApp(TypingApp(
-    gameRepository: GameRepository(hostname: "192.168.8.141", port: 9999),
+    gameRepository: GameRepository(hostname: "server.lagunastudios.de", port: 9999),
   ));
 }
 
@@ -48,13 +47,13 @@ class TypingApp extends StatelessWidget {
                 previous.currentScreen != current.currentScreen,
             builder: (context, state) {
               return switch (state.currentScreen) {
-                UsernameScreen.screenIndex => UsernameScreen(),
-                GamePinPreviewScreen.screenIndex => GamePinPreviewScreen(),
-                TeacherScreen.screenIndex => TeacherScreen(),
-                LobbyScreen.screenIndex => LobbyScreen(),
-                GameScreen.screenIndex => GameScreen(),
-                GameOverScreen.screenIndex => GameOverScreen(),
-                _ => GamePinScreen(),
+                UsernameScreen.screenIndex => const UsernameScreen(),
+                GamePinPreviewScreen.screenIndex => const GamePinPreviewScreen(),
+                TeacherScreen.screenIndex => const TeacherScreen(),
+                LobbyScreen.screenIndex => const LobbyScreen(),
+                GameScreen.screenIndex => const GameScreen(),
+                GameOverScreen.screenIndex => const GameOverScreen(),
+                _ => const GamePinScreen(),
               };
             },
           ),
@@ -79,7 +78,7 @@ class ErrorListener extends StatelessWidget {
           content: Text(
             (state.error.split(" ")..removeAt(0)).join(" "),
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 20),
+            style: const TextStyle(fontSize: 20),
           ),
           backgroundColor: Colors.redAccent,
         ));
@@ -92,6 +91,8 @@ class ErrorListener extends StatelessWidget {
 class GamePinScreen extends StatelessWidget {
   static const int screenIndex = 0;
 
+  const GamePinScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -100,15 +101,12 @@ class GamePinScreen extends StatelessWidget {
           child: Column(
             children: [
               const Spacer(),
-              Text("Schreibheld", style: GoogleFonts.fasterOne(fontSize: 120)),
-              SizedBox(
-                height: 64,
-              ),
+              Text("Schreibheld", style: GoogleFonts.butterflyKids(fontSize: 92)),
               SizedBox(
                   width: 250,
                   child: TextField(
                     controller: context.read<GameCubit>().gamePinController,
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                         border: OutlineInputBorder(), labelText: "GAME PIN"),
                   )),
               const SizedBox(
@@ -119,13 +117,13 @@ class GamePinScreen extends StatelessWidget {
                 height: 50,
                 child: OutlinedButton(
                     onPressed: context.read<GameCubit>().joinRoom,
-                    child: Text("Los gehts!"),
                     style: ButtonStyle(
                       foregroundColor: MaterialStateProperty.all(Colors.white),
                       backgroundColor: MaterialStateProperty.all(Colors.purple),
                       shape: MaterialStateProperty.all(RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(4))),
-                    )),
+                    ),
+                    child: const Text("Los gehts!")),
               ),
               const Spacer(flex: 2),
               OutlinedButton(
@@ -143,6 +141,8 @@ class GamePinScreen extends StatelessWidget {
 class UsernameScreen extends StatelessWidget {
   static const int screenIndex = 1;
 
+  const UsernameScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -151,18 +151,18 @@ class UsernameScreen extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text("Gib einen Benutzernamen ein!", style: TextStyle(fontSize: 32, color: Colors.black38),),
-              SizedBox(height: 32,),
+              const Text("Gib einen Benutzernamen ein!", style: TextStyle(fontSize: 32, color: Colors.black38),),
+              const SizedBox(height: 32,),
               SizedBox(
                   width: 250,
                   child: TextField(
                     controller: context.read<GameCubit>().usernameController,
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                       border: OutlineInputBorder(),
                       labelText: "Benutzername",
                     ),
                   )),
-              SizedBox(
+              const SizedBox(
                 height: 8,
               ),
               SizedBox(
@@ -170,13 +170,13 @@ class UsernameScreen extends StatelessWidget {
                 height: 50,
                 child: OutlinedButton(
                     onPressed: context.read<GameCubit>().saveUsername,
-                    child: Text("Weiter"),
                     style: ButtonStyle(
                         foregroundColor: MaterialStateProperty.all(Colors.white),
                         backgroundColor: MaterialStateProperty.all(Colors.purple),
                         shape: MaterialStateProperty.all(RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(4))),
-                      )),
+                      ),
+                    child: const Text("Weiter")),
               )
             ],
           ),
@@ -188,6 +188,8 @@ class UsernameScreen extends StatelessWidget {
 
 class LobbyScreen extends StatelessWidget {
   static const int screenIndex = 2;
+
+  const LobbyScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -214,17 +216,19 @@ class LobbyScreen extends StatelessWidget {
 class GameScreen extends StatelessWidget {
   static const int screenIndex = 3;
 
+  const GameScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: ErrorListener(
         child: DefaultTextStyle(
-          style: TextStyle(fontSize: 24, color: Colors.black38),
+          style: const TextStyle(fontSize: 24, color: Colors.black38),
           child: BlocBuilder<GameCubit, AppState>(
             builder: (context, state) {
               return Column(
                 children: [
-                  Padding(
+                  const Padding(
                     padding: EdgeInsets.all(8.0),
                     child: PlayerStatusBar(),
                   ),
@@ -239,17 +243,17 @@ class GameScreen extends StatelessWidget {
                           TextSpan(
                               text: state.typing,
                               style:
-                                  TextStyle(fontSize: 96, color: Colors.green)),
+                                  const TextStyle(fontSize: 96, color: Colors.green)),
                           TextSpan(
                               text: state.game!.words[state.wordIndex]
                                   .substring(state.typing.length),
-                              style: TextStyle(
+                              style: const TextStyle(
                                   fontSize: 96, color: Colors.black38)),
                         ]),
                       ),
                     ),
                   )),
-                  Padding(
+                  const Padding(
                     padding: EdgeInsets.all(8.0),
                     child: Text(
                         "Schreibe das Wort ab! Achte auf die Groß- und Kleinschreibung!"),
@@ -272,7 +276,7 @@ class PlayerStatusBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTextStyle(
-      style: TextStyle(fontSize: 24, color: Colors.black38),
+      style: const TextStyle(fontSize: 24, color: Colors.black38),
       child: Padding(
         padding: const EdgeInsets.all(8.0),
         child: BlocBuilder<GameCubit, AppState>(
@@ -287,7 +291,7 @@ class PlayerStatusBar extends StatelessWidget {
                       DropdownMenuItem(
                           onTap: context.read<GameCubit>().exit,
                           value: 0,
-                          child: Row(
+                          child: const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(Icons.logout),
@@ -303,7 +307,7 @@ class PlayerStatusBar extends StatelessWidget {
                       children: [
                         RandomAvatar(state.user?.username ?? "",
                             height: 32, width: 32),
-                        SizedBox(
+                        const SizedBox(
                           width: 8,
                         ),
                         Text(
@@ -312,7 +316,7 @@ class PlayerStatusBar extends StatelessWidget {
                         ),
                       ],
                     ),
-                    underline: SizedBox()),
+                    underline: const SizedBox()),
                 Expanded(
                     child: Text(
                   state.secondsLeft.toString(),
@@ -329,6 +333,8 @@ class PlayerStatusBar extends StatelessWidget {
 
 class GameOverScreen extends StatelessWidget {
   static const int screenIndex = 4;
+
+  const GameOverScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -355,6 +361,8 @@ class GameOverScreen extends StatelessWidget {
 class GamePinPreviewScreen extends StatelessWidget {
   static const int screenIndex = 5;
 
+  const GamePinPreviewScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -369,7 +377,7 @@ class GamePinPreviewScreen extends StatelessWidget {
                       style: TextStyle(fontSize: 48, color: Colors.black38)),
                   Text(
                     state.gameRoom!.pin.toString(),
-                    style: TextStyle(fontSize: 124),
+                    style: const TextStyle(fontSize: 124),
                   ),
                   Expanded(
                       flex: 2,
@@ -392,7 +400,7 @@ class GamePinPreviewScreen extends StatelessWidget {
                           value: !state.gameRoom!.open,
                           onChanged: (value) =>
                               context.read<TeacherCubit>().closeRoom(value!)),
-                      Text("Diesen Raum für weitere Spieler schließen")
+                      const Text("Diesen Raum für weitere Spieler schließen")
                     ],
                   ),
                   const SizedBox(
@@ -417,6 +425,8 @@ class GamePinPreviewScreen extends StatelessWidget {
 class TeacherScreen extends StatelessWidget {
   static const int screenIndex = 6;
 
+  const TeacherScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -436,7 +446,13 @@ class TeacherScreen extends StatelessWidget {
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                             children: [
                               ToggleButtons(
-                                children: [
+                                isSelected: [
+                                  for (int i = 0; i < 3; i++)
+                                    teacherState.gameMode == i
+                                ],
+                                onPressed:
+                                    context.read<TeacherCubit>().setGameMode,
+                                children: const [
                                   Tooltip(
                                       message: "Einzelspieler",
                                       child: Icon(Icons.person)),
@@ -447,12 +463,6 @@ class TeacherScreen extends StatelessWidget {
                                       message: "Zusammen",
                                       child: Icon(Icons.diversity_3)),
                                 ],
-                                isSelected: [
-                                  for (int i = 0; i < 3; i++)
-                                    teacherState.gameMode == i
-                                ],
-                                onPressed:
-                                    context.read<TeacherCubit>().setGameMode,
                               ),
                               SizedBox(
                                   width: 80,
@@ -460,7 +470,7 @@ class TeacherScreen extends StatelessWidget {
                                     controller: context
                                         .read<TeacherCubit>()
                                         .minutesController,
-                                    decoration: InputDecoration(
+                                    decoration: const InputDecoration(
                                         border: OutlineInputBorder(),
                                         labelText: "Spielzeit"),
                                   )),
@@ -474,7 +484,7 @@ class TeacherScreen extends StatelessWidget {
                                         .read<TeacherCubit>()
                                         .setTeamCount,
                                     enabled: teacherState.gameMode == 1,
-                                    decoration: InputDecoration(
+                                    decoration: const InputDecoration(
                                         border: OutlineInputBorder(),
                                         labelText: "Teams"),
                                   )),
@@ -482,13 +492,13 @@ class TeacherScreen extends StatelessWidget {
                                 onPressed: appState.secondsLeft > 0
                                     ? null
                                     : context.read<TeacherCubit>().resetPoints,
-                                icon: Icon(Icons.restart_alt),
-                                label: Text("Punkte zurücksetzten"),
+                                icon: const Icon(Icons.restart_alt),
+                                label: const Text("Punkte zurücksetzten"),
                               ),
                               OutlinedButton.icon(
                                 onPressed: context.read<GameCubit>().exit,
-                                icon: Icon(Icons.logout),
-                                label: Text("Spiel beenden"),
+                                icon: const Icon(Icons.logout),
+                                label: const Text("Spiel beenden"),
                               ),
                             ],
                           ),
@@ -504,9 +514,9 @@ class TeacherScreen extends StatelessWidget {
                 builder: (context, state) {
                   return Expanded(
                       child: switch (state.gameMode) {
-                    0 => SinglePlayerView(),
-                    1 => TeamPlayView(),
-                    _ => GroupView()
+                    0 => const SinglePlayerView(),
+                    1 => const TeamPlayView(),
+                    _ => const GroupView()
                   });
                 },
               ),
@@ -533,7 +543,7 @@ class TeacherScreen extends StatelessWidget {
                           ),
                           Text(
                             "Game Pin: ${state.gameRoom!.pin}",
-                            style: TextStyle(fontSize: 32),
+                            style: const TextStyle(fontSize: 32),
                           ),
                           SizedBox(
                             width: 200,
@@ -563,13 +573,15 @@ class TeacherScreen extends StatelessWidget {
 }
 
 class SinglePlayerView extends StatelessWidget {
+  const SinglePlayerView({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 32, top: 16, bottom: 16),
+        const Padding(
+          padding: EdgeInsets.only(left: 32, top: 16, bottom: 16),
           child: Text("Tabelle", style: TextStyle(fontSize: 24)),
         ),
         Expanded(
@@ -579,14 +591,14 @@ class SinglePlayerView extends StatelessWidget {
               players.sort((a, b) => b.points - a.points);
 
               return ListView.separated(
-                separatorBuilder: (context, index) => Divider(endIndent: 12, indent: 12,),
+                separatorBuilder: (context, index) => const Divider(endIndent: 12, indent: 12,),
                   itemCount: players.length,
                   itemBuilder: (context, index) {
                     User user = players[index];
                     return Dismissible(
                       background: Container(
                         color: Colors.red[300],
-                        child: Center(
+                        child: const Center(
                           child: Text(
                             "Spieler entfernen",
                             style: TextStyle(
@@ -603,11 +615,11 @@ class SinglePlayerView extends StatelessWidget {
                         leading: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            SizedBox(width: 64,),
-                            Text("${index + 1}.", style: TextStyle(fontSize: 24),),
-                            SizedBox(width: 16,),
+                            const SizedBox(width: 64,),
+                            Text("${index + 1}.", style: const TextStyle(fontSize: 24),),
+                            const SizedBox(width: 16,),
                             RandomAvatar(user.username, width: 44, height: 44),
-                            SizedBox(
+                            const SizedBox(
                               width: 16,
                             )
                           ],
@@ -626,6 +638,8 @@ class SinglePlayerView extends StatelessWidget {
 }
 
 class TeamPlayView extends StatelessWidget {
+  const TeamPlayView({super.key});
+
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<TeacherCubit, TeacherState>(
@@ -643,7 +657,7 @@ class TeamPlayView extends StatelessWidget {
                       Expanded(
                         flex: 1,
                         child: ListView.separated(
-                          separatorBuilder: (_, __) => Divider(endIndent: 12, indent: 12,),
+                          separatorBuilder: (_, __) => const Divider(endIndent: 12, indent: 12,),
                             itemCount: players.length,
                             itemBuilder: (context, index) {
                               User user = players[index];
@@ -670,7 +684,7 @@ class TeamPlayView extends StatelessWidget {
                               );
                             }),
                       ),
-                      SizedBox(width: 16),
+                      const SizedBox(width: 16),
                       Expanded(
                           flex: 4,
                           child: Wrap(
@@ -721,7 +735,7 @@ class TeamPlayView extends StatelessWidget {
                                               ],
                                             ),
                                           ),
-                                          SizedBox(
+                                          const SizedBox(
                                             height: 8,
                                           ),
                                           Text(
@@ -729,7 +743,7 @@ class TeamPlayView extends StatelessWidget {
                                                 .map((e) => e.points)
                                                 .sum
                                                 .toString(),
-                                            style: TextStyle(
+                                            style: const TextStyle(
                                                 fontSize: 32,
                                                 color: Colors.black38),
                                           )
@@ -743,7 +757,7 @@ class TeamPlayView extends StatelessWidget {
                     ],
                   ),
                 ),
-                Text(
+                const Text(
                   "Ziehe die Spieler in die jeweiligen Teams!",
                   style: TextStyle(fontSize: 24, color: Colors.black38),
                 )
@@ -757,6 +771,8 @@ class TeamPlayView extends StatelessWidget {
 }
 
 class GroupView extends StatelessWidget {
+  const GroupView({super.key});
+
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<GameCubit, AppState>(
