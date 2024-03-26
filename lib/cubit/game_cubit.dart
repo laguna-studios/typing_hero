@@ -50,7 +50,13 @@ class GameCubit extends HydratedCubit<AppState> {
     emit(state.copyWith(error: "$time $message"));
   }
 
-  void _onGameRoomChanged(GameRoom room) {
+  void _onGameRoomChanged(GameRoom? room) {
+    // reset game
+    if (room == null) {
+      emit(initialState);
+      return;
+    }
+
     int newRoomIndex = GamePinPreviewScreen.screenIndex;
     if (state.currentScreen == TeacherScreen.screenIndex) {
       newRoomIndex = TeacherScreen.screenIndex;
@@ -71,7 +77,7 @@ class GameCubit extends HydratedCubit<AppState> {
           emit(state.copyWith(
             secondsLeft: secondsLeft,
           ));
-          _decreaseTimer(gameOverOnZero: false);
+          checkTimer(gameOverOnZero: false);
         } else {
           emit(state.copyWith(
             secondsLeft: 0,
@@ -84,7 +90,13 @@ class GameCubit extends HydratedCubit<AppState> {
     emit(state.copyWith(gameRoom: room, currentScreen: newRoomIndex));
   }
 
-  void _onUserChanged(User user) {
+  void _onUserChanged(User? user) {
+    // reset game
+    if (user == null) {
+      emit(initialState);
+      return;
+    }
+
     int newScreenIndex = UsernameScreen.screenIndex;
 
     // resetting points in game over screen
@@ -104,7 +116,13 @@ class GameCubit extends HydratedCubit<AppState> {
     emit(state.copyWith(user: user, currentScreen: newScreenIndex));
   }
 
-  void _onGameChanged(Game game) {
+  void _onGameChanged(Game? game) {
+    // reset game
+    if (game == null) {
+      emit(initialState);
+      return;
+    }
+
     DateTime begin = DateTime.fromMillisecondsSinceEpoch(game.startTime);
     DateTime end = DateTime.fromMillisecondsSinceEpoch(game.endTime);
 
@@ -116,11 +134,10 @@ class GameCubit extends HydratedCubit<AppState> {
       if (secondsLeft > 0) {
         emit(state.copyWith(
             game: game,
-            wordIndex: 0,
             typing: "",
             secondsLeft: secondsLeft,
             currentScreen: GameScreen.screenIndex));
-        _decreaseTimer();
+        checkTimer();
       } else {
         emit(state.copyWith(
             game: game,
@@ -132,19 +149,33 @@ class GameCubit extends HydratedCubit<AppState> {
     });
   }
 
-  void _decreaseTimer({bool gameOverOnZero = true}) {
+  void checkTimer({bool gameOverOnZero = true}) {
+    // not in game anymore
+    if (state.currentScreen != GameScreen.screenIndex && state.currentScreen != TeacherScreen.screenIndex) {
+      counting = false;
+      return;
+    }
 
-    if (state.secondsLeft < 1) {
+    int? endTime = state.game?.endTime ?? state.gameRoom?.game?.endTime;
+    if (endTime == null) {
+      return;
+    }
+  
+    int secondsLeft = (endTime - DateTime.now().millisecondsSinceEpoch) ~/ 1000;
+
+    if (secondsLeft < 1) {
       if (gameOverOnZero) {
-        emit(state.copyWith(currentScreen: GameOverScreen.screenIndex));
+        emit(state.copyWith(
+          secondsLeft: 0,
+          currentScreen: GameOverScreen.screenIndex));
       }
       counting = false;
       return;
     }
 
     Future.delayed(const Duration(seconds: 1), () {
-      emit(state.copyWith(secondsLeft: state.secondsLeft - 1));
-      _decreaseTimer(gameOverOnZero: gameOverOnZero);
+      emit(state.copyWith(secondsLeft: secondsLeft - 1));
+      checkTimer(gameOverOnZero: gameOverOnZero);
     });
   }
 
@@ -160,6 +191,8 @@ class GameCubit extends HydratedCubit<AppState> {
       _checkPageReloadPlayer();
     } else if (state.gameRoom != null) {
       _checkPageReloadTeacher();
+    } else {
+      emit(initialState);
     }
   }
 
@@ -168,6 +201,7 @@ class GameCubit extends HydratedCubit<AppState> {
 
     // no game started yet
     if (state.gameRoom!.game == null) {
+      emit(state.copyWith(secondsLeft: 0, typing: "", wordIndex: 0));
       return;
     }
 
@@ -175,7 +209,7 @@ class GameCubit extends HydratedCubit<AppState> {
     int secondsLeft = (state.gameRoom!.game!.endTime - DateTime.now().millisecondsSinceEpoch) ~/ 1000;
     if (secondsLeft > 0) {
       emit(state.copyWith(secondsLeft: secondsLeft));
-      _decreaseTimer(gameOverOnZero: false);
+      checkTimer(gameOverOnZero: false);
     } else {
       emit(state.copyWith(secondsLeft: 0));
     }
@@ -192,7 +226,7 @@ class GameCubit extends HydratedCubit<AppState> {
     int secondsLeft = (state.game!.endTime - DateTime.now().millisecondsSinceEpoch) ~/ 1000;
     if (secondsLeft > 0) {
       emit(state.copyWith(secondsLeft: secondsLeft));
-      _decreaseTimer();
+      checkTimer();
     } else {
       emit(state.copyWith(secondsLeft: 0, currentScreen: GameOverScreen.screenIndex));
     }
@@ -242,6 +276,10 @@ class GameCubit extends HydratedCubit<AppState> {
     }
   }
   
+  void exit() {
+    gameRepository.exit();
+  }
+
   @override
   AppState? fromJson(Map<String, dynamic> json) {
     return AppState.fromJson(json);

@@ -12,8 +12,8 @@ import 'package:collection/collection.dart';
 Future<void> main() async {
   // setup for hydrated cubit
   WidgetsFlutterBinding.ensureInitialized();
-  HydratedBloc.storage = await HydratedStorage.build(storageDirectory: HydratedStorage.webStorageDirectory);
-
+  HydratedBloc.storage = await HydratedStorage.build(
+      storageDirectory: HydratedStorage.webStorageDirectory);
 
   runApp(TypingApp(
     gameRepository: GameRepository(hostname: "192.168.43.49", port: 9999),
@@ -33,7 +33,8 @@ class TypingApp extends StatelessWidget {
         providers: [
           BlocProvider<GameCubit>(
             create: (context) => GameCubit(GameCubit.initialState,
-                gameRepository: gameRepository)..checkPageReload(),
+                gameRepository: gameRepository)
+              ..checkPageReload(),
           ),
           BlocProvider<TeacherCubit>(
             create: (context) => TeacherCubit(TeacherCubit.initialState,
@@ -44,20 +45,17 @@ class TypingApp extends StatelessWidget {
           home: BlocBuilder<GameCubit, AppState>(
             buildWhen: (previous, current) =>
                 previous.currentScreen != current.currentScreen,
-            builder: (context, state)
-              {
-                return switch (state.currentScreen) {
-                  UsernameScreen.screenIndex => UsernameScreen(),
-                  GamePinPreviewScreen.screenIndex => GamePinPreviewScreen(),
-                  TeacherScreen.screenIndex => TeacherScreen(),
-                  LobbyScreen.screenIndex => LobbyScreen(),
-                  GameScreen.screenIndex => GameScreen(),
-                  GameOverScreen.screenIndex => GameOverScreen(),
-                  _ => GamePinScreen(),
-                };
-              }
-              
-            ,
+            builder: (context, state) {
+              return switch (state.currentScreen) {
+                UsernameScreen.screenIndex => UsernameScreen(),
+                GamePinPreviewScreen.screenIndex => GamePinPreviewScreen(),
+                TeacherScreen.screenIndex => TeacherScreen(),
+                LobbyScreen.screenIndex => LobbyScreen(),
+                GameScreen.screenIndex => GameScreen(),
+                GameOverScreen.screenIndex => GameOverScreen(),
+                _ => GamePinScreen(),
+              };
+            },
           ),
         ),
       ),
@@ -133,26 +131,28 @@ class UsernameScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-                width: 250,
-                child: TextField(
-                  controller: context.read<GameCubit>().usernameController,
-                  decoration: InputDecoration(
-                    border: OutlineInputBorder(),
-                    labelText: "Benutzername",
-                  ),
-                )),
-            SizedBox(
-              height: 8,
-            ),
-            OutlinedButton(
-                onPressed: context.read<GameCubit>().saveUsername,
-                child: Text("Weiter"))
-          ],
+      body: ErrorListener(
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                  width: 250,
+                  child: TextField(
+                    controller: context.read<GameCubit>().usernameController,
+                    decoration: InputDecoration(
+                      border: OutlineInputBorder(),
+                      labelText: "Benutzername",
+                    ),
+                  )),
+              SizedBox(
+                height: 8,
+              ),
+              OutlinedButton(
+                  onPressed: context.read<GameCubit>().saveUsername,
+                  child: Text("Weiter"))
+            ],
+          ),
         ),
       ),
     );
@@ -165,12 +165,21 @@ class LobbyScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
-      body: Center(
-          child: Text(
-        "Mach dich bereit!\nEs geht gleich los...",
-        style: TextStyle(fontSize: 72, color: Colors.black38),
-        textAlign: TextAlign.center,
-      )),
+      body: ErrorListener(
+        child: Column(
+          children: [
+            PlayerStatusBar(),
+            Expanded(
+              child: Center(
+                  child: Text(
+                "Mach dich bereit!\nEs geht gleich los...",
+                style: TextStyle(fontSize: 72, color: Colors.black38),
+                textAlign: TextAlign.center,
+              )),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -181,57 +190,81 @@ class GameScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: DefaultTextStyle(
-        style: TextStyle(fontSize: 24, color: Colors.black38),
+      body: ErrorListener(
+        child: DefaultTextStyle(
+          style: TextStyle(fontSize: 24, color: Colors.black38),
+          child: BlocBuilder<GameCubit, AppState>(
+            builder: (context, state) {
+              return Column(
+                children: [
+                  Padding(
+                    padding: EdgeInsets.all(8.0),
+                    child: PlayerStatusBar(),
+                  ),
+                  Expanded(
+                      child: Center(
+                    child: KeyboardListener(
+                      focusNode: context.read<GameCubit>().focusNode
+                        ..requestFocus(),
+                      onKeyEvent: context.read<GameCubit>().enterCharacter,
+                      child: RichText(
+                        text: TextSpan(children: [
+                          TextSpan(
+                              text: state.typing,
+                              style:
+                                  TextStyle(fontSize: 96, color: Colors.green)),
+                          TextSpan(
+                              text: state.game!.words[state.wordIndex]
+                                  .substring(state.typing.length),
+                              style:
+                                  TextStyle(fontSize: 96, color: Colors.black38)),
+                        ]),
+                      ),
+                    ),
+                  )),
+                  Padding(
+                    padding: EdgeInsets.all(8.0),
+                    child: Text(
+                        "Schreibe das Wort ab! Achte auf die Groß- und Kleinschreibung!"),
+                  )
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class PlayerStatusBar extends StatelessWidget {
+  const PlayerStatusBar({
+    super.key,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return DefaultTextStyle(
+      style: TextStyle(fontSize: 24, color: Colors.black38),
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
         child: BlocBuilder<GameCubit, AppState>(
           builder: (context, state) {
-            return Column(
+            return Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Padding(
-                  padding: EdgeInsets.all(8.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(child: Text("Punkte: ${state.user!.points}")),
-                      Expanded(
-                          child: Text(
-                        state.user!.username,
-                        textAlign: TextAlign.center,
-                      )),
-                      Expanded(
-                          child: Text(
-                        state.secondsLeft.toString(),
-                        textAlign: TextAlign.right,
-                      ))
-                    ],
-                  ),
-                ),
+                Expanded(child: Text("Punkte: ${state.user?.points ?? 0}")),
                 Expanded(
-                    child: Center(
-                  child: KeyboardListener(
-                    focusNode: context.read<GameCubit>().focusNode
-                      ..requestFocus(),
-                    onKeyEvent: context.read<GameCubit>().enterCharacter,
-                    child: RichText(
-                      text: TextSpan(children: [
-                        TextSpan(
-                            text: state.typing,
-                            style:
-                                TextStyle(fontSize: 96, color: Colors.green)),
-                        TextSpan(
-                            text: state.game!.words[state.wordIndex]
-                                .substring(state.typing.length),
-                            style:
-                                TextStyle(fontSize: 96, color: Colors.black38)),
-                      ]),
-                    ),
-                  ),
+                    child: Text(
+                  state.user?.username ?? "",
+                  textAlign: TextAlign.center,
                 )),
-                Padding(
-                  padding: EdgeInsets.all(8.0),
-                  child: Text(
-                      "Schreibe das Wort ab! Achte auf die Groß- und Kleinschreibung!"),
-                )
+                Expanded(
+                    child: Text(
+                  state.secondsLeft.toString(),
+                  textAlign: TextAlign.right,
+                )),
+                OutlinedButton.icon(label: Text("Raum verlassen"), onPressed: context.read<GameCubit>().exit, icon: Icon(Icons.logout))
               ],
             );
           },
@@ -247,10 +280,19 @@ class GameOverScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
-      body: Center(
-        child: Text(
-          "Game Over",
-          style: TextStyle(fontSize: 72, color: Colors.black38),
+      body: ErrorListener(
+        child: Column(
+          children: [
+            PlayerStatusBar(),
+            Expanded(
+              child: Center(
+                child: Text(
+                  "Game Over",
+                  style: TextStyle(fontSize: 72, color: Colors.black38),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -263,55 +305,57 @@ class GamePinPreviewScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: BlocBuilder<GameCubit, AppState>(
-        builder: (context, state) {
-          return Center(
-            child: Column(
-              children: [
-                const Spacer(),
-                const Text("Der Game Pin lautet:",
-                    style: TextStyle(fontSize: 48, color: Colors.black38)),
-                Text(
-                  state.gameRoom!.pin.toString(),
-                  style: TextStyle(fontSize: 124),
-                ),
-                Expanded(
-                    flex: 2,
-                    child: Wrap(
-                      runAlignment: WrapAlignment.center,
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (User user in state.gameRoom!.players)
-                          Chip(
-                              avatar: RandomAvatar(user.username,
-                                  height: 64, width: 64),
-                              label: Text(user.username)),
-                      ],
-                    )),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Checkbox(
-                        value: !state.gameRoom!.open,
-                        onChanged: (value) =>
-                            context.read<TeacherCubit>().closeRoom(value!)),
-                    Text("Diesen Raum für weitere Spieler schließen")
-                  ],
-                ),
-                const SizedBox(
-                  height: 8,
-                ),
-                OutlinedButton(
-                    onPressed: context.read<GameCubit>().goToTeacherScreen,
-                    child: const Text("Weiter")),
-                const SizedBox(
-                  height: 8,
-                )
-              ],
-            ),
-          );
-        },
+      body: ErrorListener(
+        child: BlocBuilder<GameCubit, AppState>(
+          builder: (context, state) {
+            return Center(
+              child: Column(
+                children: [
+                  const Spacer(),
+                  const Text("Der Game Pin lautet:",
+                      style: TextStyle(fontSize: 48, color: Colors.black38)),
+                  Text(
+                    state.gameRoom!.pin.toString(),
+                    style: TextStyle(fontSize: 124),
+                  ),
+                  Expanded(
+                      flex: 2,
+                      child: Wrap(
+                        runAlignment: WrapAlignment.center,
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (User user in state.gameRoom!.players)
+                            Chip(
+                                avatar: RandomAvatar(user.username,
+                                    height: 64, width: 64),
+                                label: Text(user.username)),
+                        ],
+                      )),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Checkbox(
+                          value: !state.gameRoom!.open,
+                          onChanged: (value) =>
+                              context.read<TeacherCubit>().closeRoom(value!)),
+                      Text("Diesen Raum für weitere Spieler schließen")
+                    ],
+                  ),
+                  const SizedBox(
+                    height: 8,
+                  ),
+                  OutlinedButton(
+                      onPressed: context.read<GameCubit>().goToTeacherScreen,
+                      child: const Text("Weiter")),
+                  const SizedBox(
+                    height: 8,
+                  )
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -323,134 +367,141 @@ class TeacherScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Column(
-          children: [
-            SizedBox(
-              height: 80,
-              child: BlocBuilder<GameCubit, AppState>(
-                builder: (context, appState) {
-                  return BlocBuilder<TeacherCubit, TeacherState>(
-                    builder: (context, teacherState) {
-                      return Card(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            ToggleButtons(
-                              children: [
-                                Tooltip(
-                                    message: "Einzelspieler",
-                                    child: Icon(Icons.person)),
-                                Tooltip(
-                                    message: "Teams",
-                                    child: Icon(Icons.groups)),
-                                Tooltip(
-                                    message: "Zusammen",
-                                    child: Icon(Icons.diversity_3)),
-                              ],
-                              isSelected: [
-                                for (int i = 0; i < 3; i++)
-                                  teacherState.gameMode == i
-                              ],
-                              onPressed:
-                                  context.read<TeacherCubit>().setGameMode,
-                            ),
-                            SizedBox(
-                                width: 250,
-                                child: TextField(
-                                  controller: context
-                                      .read<TeacherCubit>()
-                                      .minutesController,
-                                  decoration: InputDecoration(
-                                      border: OutlineInputBorder(),
-                                      labelText: "Spielzeit"),
-                                )),
-                            SizedBox(
-                                width: 250,
-                                child: TextField(
-                                  controller: context
-                                      .read<TeacherCubit>()
-                                      .teamsController,
-                                  onChanged:
-                                      context.read<TeacherCubit>().setTeamCount,
-                                  enabled: teacherState.gameMode == 1,
-                                  decoration: InputDecoration(
-                                      border: OutlineInputBorder(),
-                                      labelText: "Teams"),
-                                )),
-                            OutlinedButton.icon(
-                              onPressed: appState.secondsLeft > 0
-                                  ? null
-                                  : context.read<TeacherCubit>().resetPoints,
-                              icon: Icon(Icons.restart_alt),
-                              label: Text("Punkte zurücksetzten"),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  );
-                },
+      body: ErrorListener(
+        child: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Column(
+            children: [
+              SizedBox(
+                height: 80,
+                child: BlocBuilder<GameCubit, AppState>(
+                  builder: (context, appState) {
+                    return BlocBuilder<TeacherCubit, TeacherState>(
+                      builder: (context, teacherState) {
+                        return Card(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              ToggleButtons(
+                                children: [
+                                  Tooltip(
+                                      message: "Einzelspieler",
+                                      child: Icon(Icons.person)),
+                                  Tooltip(
+                                      message: "Teams",
+                                      child: Icon(Icons.groups)),
+                                  Tooltip(
+                                      message: "Zusammen",
+                                      child: Icon(Icons.diversity_3)),
+                                ],
+                                isSelected: [
+                                  for (int i = 0; i < 3; i++)
+                                    teacherState.gameMode == i
+                                ],
+                                onPressed:
+                                    context.read<TeacherCubit>().setGameMode,
+                              ),
+                              SizedBox(
+                                  width: 80,
+                                  child: TextField(
+                                    controller: context
+                                        .read<TeacherCubit>()
+                                        .minutesController,
+                                    decoration: InputDecoration(
+                                        border: OutlineInputBorder(),
+                                        labelText: "Spielzeit"),
+                                  )),
+                              SizedBox(
+                                  width: 80,
+                                  child: TextField(
+                                    controller: context
+                                        .read<TeacherCubit>()
+                                        .teamsController,
+                                    onChanged:
+                                        context.read<TeacherCubit>().setTeamCount,
+                                    enabled: teacherState.gameMode == 1,
+                                    decoration: InputDecoration(
+                                        border: OutlineInputBorder(),
+                                        labelText: "Teams"),
+                                  )),
+                              OutlinedButton.icon(
+                                onPressed: appState.secondsLeft > 0
+                                    ? null
+                                    : context.read<TeacherCubit>().resetPoints,
+                                icon: Icon(Icons.restart_alt),
+                                label: Text("Punkte zurücksetzten"),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: context.read<GameCubit>().exit,
+                                icon: Icon(Icons.logout),
+                                label: Text("Raum schließen"),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
               ),
-            ),
-            BlocBuilder<TeacherCubit, TeacherState>(
-              buildWhen: (previous, current) =>
-                  previous.gameMode != current.gameMode,
-              builder: (context, state) {
-                return Expanded(
-                    child: switch (state.gameMode) {
-                  0 => SinglePlayerView(),
-                  1 => TeamPlayView(),
-                  _ => GroupView()
-                });
-              },
-            ),
-            SizedBox(
-              height: 80,
-              child: BlocBuilder<GameCubit, AppState>(
+              BlocBuilder<TeacherCubit, TeacherState>(
+                buildWhen: (previous, current) =>
+                    previous.gameMode != current.gameMode,
                 builder: (context, state) {
-                  return Card(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        SizedBox(
-                          width: 200,
-                          child: OutlinedButton.icon(
-                              onPressed: () => context
-                                  .read<TeacherCubit>()
-                                  .closeRoom(state.gameRoom!.open),
-                              icon: Icon(state.gameRoom!.open
-                                  ? Icons.lock_open
-                                  : Icons.lock),
-                              label: Text(state.gameRoom!.open
-                                  ? "Offen"
-                                  : "Geschlossen")),
-                        ),
-                        Text(
-                          "Game Pin: ${state.gameRoom!.pin}",
-                          style: TextStyle(fontSize: 32),
-                        ),
-                        SizedBox(
-                          width: 200,
-                          child: OutlinedButton.icon(
-                              onPressed: state.secondsLeft > 0
-                                  ? null
-                                  : context.read<TeacherCubit>().startGame,
-                              icon: Icon(state.secondsLeft > 0
-                                  ? Icons.timer
-                                  : Icons.play_arrow),
-                              label: Text(state.secondsLeft > 0
-                                  ? "Noch ${state.secondsLeft} Sekunden"
-                                  : "Spiel starten")),
-                        )
-                      ],
-                    ),
-                  );
+                  return Expanded(
+                      child: switch (state.gameMode) {
+                    0 => SinglePlayerView(),
+                    1 => TeamPlayView(),
+                    _ => GroupView()
+                  });
                 },
               ),
-            )
-          ],
+              SizedBox(
+                height: 80,
+                child: BlocBuilder<GameCubit, AppState>(
+                  builder: (context, state) {
+                    return Card(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          SizedBox(
+                            width: 200,
+                            child: OutlinedButton.icon(
+                                onPressed: () => context
+                                    .read<TeacherCubit>()
+                                    .closeRoom(state.gameRoom!.open),
+                                icon: Icon(state.gameRoom!.open
+                                    ? Icons.lock_open
+                                    : Icons.lock),
+                                label: Text(state.gameRoom!.open
+                                    ? "Offen"
+                                    : "Geschlossen")),
+                          ),
+                          Text(
+                            "Game Pin: ${state.gameRoom!.pin}",
+                            style: TextStyle(fontSize: 32),
+                          ),
+                          SizedBox(
+                            width: 200,
+                            child: OutlinedButton.icon(
+                                onPressed: state.secondsLeft > 0
+                                    ? null
+                                    : context.read<TeacherCubit>().startGame,
+                                icon: Icon(state.secondsLeft > 0
+                                    ? Icons.timer
+                                    : Icons.play_arrow),
+                                label: Text(state.secondsLeft > 0
+                                    ? "Noch ${state.secondsLeft} Sekunden"
+                                    : "Spiel starten")),
+                          )
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              )
+            ],
+          ),
         ),
       ),
     );
@@ -471,7 +522,8 @@ class SinglePlayerView extends StatelessWidget {
               User user = players[index];
               return Dismissible(
                 key: ValueKey(user.id),
-                onDismissed: (_) => context.read<TeacherCubit>().removePlayer(user),
+                onDismissed: (_) =>
+                    context.read<TeacherCubit>().removePlayer(user),
                 child: ListTile(
                   leading: RandomAvatar(user.username),
                   title: Text(user.username),
@@ -508,13 +560,18 @@ class TeamPlayView extends StatelessWidget {
                           feedback: Material(
                             child: Chip(
                               avatar: RandomAvatar(user.username),
-                              label: Text(user.username),),
+                              label: Text(user.username),
+                            ),
                           ),
                           child: ListTile(
                             leading: RandomAvatar(user.username,
                                 width: 44, height: 44),
                             title: Text(user.username),
-                            tileColor: teacherState.membership[user.id] == null ? null : TeacherCubit.teamColors[teacherState.membership[user.id]!].withAlpha(150),
+                            tileColor: teacherState.membership[user.id] == null
+                                ? null
+                                : TeacherCubit.teamColors[
+                                        teacherState.membership[user.id]!]
+                                    .withAlpha(150),
                           ),
                         );
                       }),
@@ -525,41 +582,61 @@ class TeamPlayView extends StatelessWidget {
                     child: Wrap(
                       alignment: WrapAlignment.center,
                       runAlignment: WrapAlignment.center,
-
                       children: [
-                        for (int i = 0; i < teacherState.teamCount; i++) Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: DragTarget<User>(
-                            onWillAcceptWithDetails: (_) => true,
-                            onAcceptWithDetails: (details) {
-                              context.read<TeacherCubit>().setMembership(details.data, i);
-                            },
-                            builder: (context, candidateData, rejectedData) {
-                              Iterable<User> users = appState.gameRoom!.players.where((element) => (teacherState.membership[element.id] ?? -1) == i);
+                        for (int i = 0; i < teacherState.teamCount; i++)
+                          Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: DragTarget<User>(
+                              onWillAcceptWithDetails: (_) => true,
+                              onAcceptWithDetails: (details) {
+                                context
+                                    .read<TeacherCubit>()
+                                    .setMembership(details.data, i);
+                              },
+                              builder: (context, candidateData, rejectedData) {
+                                Iterable<User> users = appState
+                                    .gameRoom!.players
+                                    .where((element) =>
+                                        (teacherState.membership[element.id] ??
+                                            -1) ==
+                                        i);
 
-                              return Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                  height: 200,
-                                  width: 200,
-                                  color: TeacherCubit.teamColors[i].withAlpha(150),
-                                  child: Wrap(
-                                    alignment: WrapAlignment.center,
-                                    runAlignment: WrapAlignment.center,
-                                    runSpacing: 4,
-                                    spacing: 4,
-                                    children: [
-                                    for (User user in users) Chip(avatar: RandomAvatar(user.username), label: Text(user.username),)
-                                  ],),),
-                                  SizedBox(height: 8,),
-                                  Text(users.map((e) => e.points).sum.toString(), style: TextStyle(fontSize: 32, color: Colors.black38),)
-                                ],
-                              );
-                            },
-                            
-                          ),
-                        )
+                                return Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      height: 200,
+                                      width: 200,
+                                      color: TeacherCubit.teamColors[i]
+                                          .withAlpha(150),
+                                      child: Wrap(
+                                        alignment: WrapAlignment.center,
+                                        runAlignment: WrapAlignment.center,
+                                        runSpacing: 4,
+                                        spacing: 4,
+                                        children: [
+                                          for (User user in users)
+                                            Chip(
+                                              avatar:
+                                                  RandomAvatar(user.username),
+                                              label: Text(user.username),
+                                            )
+                                        ],
+                                      ),
+                                    ),
+                                    SizedBox(
+                                      height: 8,
+                                    ),
+                                    Text(
+                                      users.map((e) => e.points).sum.toString(),
+                                      style: TextStyle(
+                                          fontSize: 32, color: Colors.black38),
+                                    )
+                                  ],
+                                );
+                              },
+                            ),
+                          )
                       ],
                     ))
               ],

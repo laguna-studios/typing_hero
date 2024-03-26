@@ -25,22 +25,22 @@ class GameRepository {
   late WebSocketChannel _webSocketChannel;
   StreamSubscription? _subscription;
 
-  final StreamController<GameRoom> _currentGameRoomController;
-  late final Stream<GameRoom> currentGameRoom;
+  final StreamController<GameRoom?> _currentGameRoomController;
+  late final Stream<GameRoom?> currentGameRoom;
 
-  final StreamController<User> _currentUserController;
-  late final Stream<User> currentUser;
+  final StreamController<User?> _currentUserController;
+  late final Stream<User?> currentUser;
 
-  final StreamController<Game> _currentGameController;
-  late final Stream<Game> currentGame;
+  final StreamController<Game?> _currentGameController;
+  late final Stream<Game?> currentGame;
 
   final StreamController<String> _errorStreamController;
   late final Stream<String> errors;
 
   GameRepository({required this.hostname, required this.port})
-      : _currentGameRoomController = StreamController<GameRoom>(),
-        _currentUserController = StreamController<User>(),
-        _currentGameController = StreamController<Game>(),
+      : _currentGameRoomController = StreamController<GameRoom?>(),
+        _currentUserController = StreamController<User?>(),
+        _currentGameController = StreamController<Game?>(),
         _errorStreamController = StreamController<String>() {
     currentGameRoom = _currentGameRoomController.stream;
     currentUser = _currentUserController.stream;
@@ -137,6 +137,11 @@ class GameRepository {
         ErrorMessage errorMessage = ErrorMessage.fromJson(json);
         _errorStreamController.add(errorMessage.message);
 
+      case "ExitMessage":
+        _currentGameController.add(null);
+        _currentUserController.add(null);
+        _currentGameRoomController.add(null);
+
       default:
         print("Unknown Message: $json");
     }
@@ -200,5 +205,12 @@ class GameRepository {
   void scorePoints(int points) {
     _send("ScorePointsMessage",
         ScorePointsMessage(pin: _gameRoomPin!, points: points).toJson());
+  }
+
+  void exit() {
+    _send("ExitMessage", {});
+    _currentGameController.add(null);
+    _currentUserController.add(null);
+    _currentGameRoomController.add(null);
   }
 }

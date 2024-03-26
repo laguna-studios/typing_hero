@@ -9,6 +9,7 @@ import 'package:typing_hero/types.dart';
 import 'package:typing_hero/types/closeroommessage.dart';
 import 'package:typing_hero/types/enterroommessage.dart';
 import 'package:typing_hero/types/errormessage.dart';
+import 'package:typing_hero/types/exitmessage.dart';
 import 'package:typing_hero/types/reconnectmessage.dart';
 import 'package:typing_hero/types/removeplayermessage.dart';
 import 'package:typing_hero/types/resetpointsmessage.dart';
@@ -18,7 +19,7 @@ import 'package:typing_hero/types/startgamemessage.dart';
 import 'package:uuid/uuid.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-const String ip = "192.168.43.49";
+const String ip = "0.0.0.0";
 
 void main() async {
   GameServer server = GameServer();
@@ -112,11 +113,6 @@ class GameServer {
         _send(userId, "User", user.toJson());
         _send(rooms[index].ownerId, "GameRoom", rooms[index].toJson());
 
-        // send game to new player
-        if (rooms[index].game != null) {
-          _send(userId, "Game", rooms[index].game!.toJson());
-        }
-
       case "SaveUsernameMessage":
         SaveUsernameMessage req = SaveUsernameMessage.fromJson(json);
 
@@ -144,6 +140,11 @@ class GameServer {
         
         _send(userId, "User", rooms[roomIndex].players[userIndex].toJson());
         _send(rooms[roomIndex].ownerId, "GameRoom", rooms[roomIndex].toJson());
+
+        // send game to new player
+        if (rooms[roomIndex].game != null) {
+          _send(userId, "Game", rooms[roomIndex].game!.toJson());
+        }
 
       case "ScorePointsMessage":
         ScorePointsMessage req = ScorePointsMessage.fromJson(json);
@@ -234,10 +235,12 @@ class GameServer {
 
       case "ReconnectMessage":
         ReconnectMessage req = ReconnectMessage.fromJson(json);
+        print(req);
 
         // user doesn't exist
         if (!connections.containsKey(req.oldUserId)) {
           _send(userId, "ErrorMessage", ErrorMessage(message: "ReconnectMessage: Alte User ID ist ungültig").toJson());
+          _send(userId, "ExitMessage", ExitMessage().toJson());
           return;
         }
 
@@ -245,6 +248,7 @@ class GameServer {
         int roomIndex = rooms.indexWhere((element) => element.pin == req.pin);
         if (roomIndex == -1) {
           _sendRoomNotFound(userId, tag: "ReconnectMessage");
+          _send(userId, "ExitMessage", ExitMessage().toJson());
           return;
         }
 
@@ -253,6 +257,7 @@ class GameServer {
           // old user is room owner
           if (rooms[roomIndex].ownerId != req.oldUserId) {
             _sendUnauthorizedError(userId, tag: "ReconnectMessage");
+            _send(userId, "ExitMessage", ExitMessage().toJson());
             return;
           }
 
@@ -266,6 +271,7 @@ class GameServer {
           int playerIndex = rooms[roomIndex].players.indexWhere((element) => element.id == req.oldUserId);
           if (playerIndex == -1) {
             _send(userId, "ErrorMessage", ErrorMessage(message: "ReconnectMessage: Spieler nicht im Raum gefunden").toJson());
+            _send(userId, "ExitMessage", ExitMessage().toJson());
             return;
           }
 
@@ -273,10 +279,10 @@ class GameServer {
           rooms[roomIndex].players[playerIndex].id = userId;
 
           // send user info back to player
-          _send(req.oldUserId, "User", rooms[roomIndex].players[playerIndex].toJson());
+          _send(userId, "User", rooms[roomIndex].players[playerIndex].toJson());
 
           if (rooms[roomIndex].game != null) {
-            _send(req.oldUserId, "Game", rooms[roomIndex].game!.toJson());
+            _send(userId, "Game", rooms[roomIndex].game!.toJson());
           }
         }
 
@@ -310,10 +316,39 @@ class GameServer {
         }
 
         // remove player
-        rooms[roomIndex].players.removeAt(playerIndex);
+        User user = rooms[roomIndex].players.removeAt(playerIndex);
+
+        // send exit message to player
+        _send(user.id, "ExitMessage", ExitMessage().toJson());
+        _send(user.id, "ErrorMessage", ErrorMessage(message: "Du wurdest aus dem Raum entfernt").toJson());
 
         // send room info to teacher
         _send(rooms[roomIndex].ownerId, "GameRoom", rooms[roomIndex].toJson());
+
+      case "ExitMessage":
+        // teacher case
+        int roomIndex = rooms.indexWhere((element) => element.ownerId == userId);
+        if (roomIndex != -1) {
+          
+          for (User user in rooms[roomIndex].players) {
+            _send(user.id, "ErrorMessage", ErrorMessage(message: "Der Lehrer hat den Raum verlassen!").toJson());
+            _send(user.id, "ExitMessage", ExitMessage().toJson());
+          }
+
+          rooms.removeAt(roomIndex);
+          return;
+        }
+
+        // player case
+        for (GameRoom room in rooms) {
+          int playerIndex = room.players.indexWhere((element) => element.id == userId);
+          if (playerIndex != -1) {
+            User user = room.players.removeAt(playerIndex);
+            _send(room.ownerId, "GameRoom", room.toJson());
+            _send(room.ownerId, "ErrorMessage", ErrorMessage(message: "${user.username} hat den Raum verlassen!").toJson());
+            return;
+          }
+        }
 
       default:
         print("[!] Unknown Message: $json");
