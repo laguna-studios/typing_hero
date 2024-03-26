@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'package:random_avatar/random_avatar.dart';
 import 'package:typing_hero/cubit/game_cubit.dart';
@@ -16,7 +17,7 @@ Future<void> main() async {
       storageDirectory: HydratedStorage.webStorageDirectory);
 
   runApp(TypingApp(
-    gameRepository: GameRepository(hostname: "192.168.43.49", port: 9999),
+    gameRepository: GameRepository(hostname: "192.168.8.141", port: 9999),
   ));
 }
 
@@ -99,6 +100,10 @@ class GamePinScreen extends StatelessWidget {
           child: Column(
             children: [
               const Spacer(),
+              Text("Schreibheld", style: GoogleFonts.fasterOne(fontSize: 120)),
+              SizedBox(
+                height: 64,
+              ),
               SizedBox(
                   width: 250,
                   child: TextField(
@@ -109,10 +114,20 @@ class GamePinScreen extends StatelessWidget {
               const SizedBox(
                 height: 8,
               ),
-              OutlinedButton(
-                  onPressed: context.read<GameCubit>().joinRoom,
-                  child: Text("Los gehts!")),
-              const Spacer(),
+              SizedBox(
+                width: 250,
+                height: 50,
+                child: OutlinedButton(
+                    onPressed: context.read<GameCubit>().joinRoom,
+                    child: Text("Los gehts!"),
+                    style: ButtonStyle(
+                      foregroundColor: MaterialStateProperty.all(Colors.white),
+                      backgroundColor: MaterialStateProperty.all(Colors.purple),
+                      shape: MaterialStateProperty.all(RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(4))),
+                    )),
+              ),
+              const Spacer(flex: 2),
               OutlinedButton(
                   onPressed: context.read<GameCubit>().createRoom,
                   child: const Text("Weiter als Lehrer")),
@@ -136,6 +151,8 @@ class UsernameScreen extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              Text("Gib einen Benutzernamen ein!", style: TextStyle(fontSize: 32, color: Colors.black38),),
+              SizedBox(height: 32,),
               SizedBox(
                   width: 250,
                   child: TextField(
@@ -148,9 +165,19 @@ class UsernameScreen extends StatelessWidget {
               SizedBox(
                 height: 8,
               ),
-              OutlinedButton(
-                  onPressed: context.read<GameCubit>().saveUsername,
-                  child: Text("Weiter"))
+              SizedBox(
+                width: 250,
+                height: 50,
+                child: OutlinedButton(
+                    onPressed: context.read<GameCubit>().saveUsername,
+                    child: Text("Weiter"),
+                    style: ButtonStyle(
+                        foregroundColor: MaterialStateProperty.all(Colors.white),
+                        backgroundColor: MaterialStateProperty.all(Colors.purple),
+                        shape: MaterialStateProperty.all(RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(4))),
+                      )),
+              )
             ],
           ),
         ),
@@ -216,8 +243,8 @@ class GameScreen extends StatelessWidget {
                           TextSpan(
                               text: state.game!.words[state.wordIndex]
                                   .substring(state.typing.length),
-                              style:
-                                  TextStyle(fontSize: 96, color: Colors.black38)),
+                              style: TextStyle(
+                                  fontSize: 96, color: Colors.black38)),
                         ]),
                       ),
                     ),
@@ -254,17 +281,43 @@ class PlayerStatusBar extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(child: Text("Punkte: ${state.user?.points ?? 0}")),
-                Expanded(
-                    child: Text(
-                  state.user?.username ?? "",
-                  textAlign: TextAlign.center,
-                )),
+                DropdownButton(
+                    isExpanded: false,
+                    items: [
+                      DropdownMenuItem(
+                          onTap: context.read<GameCubit>().exit,
+                          value: 0,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.logout),
+                              SizedBox(
+                                width: 8,
+                              ),
+                              Text("Spiel verlassen"),
+                            ],
+                          )),
+                    ],
+                    onChanged: (_) {},
+                    hint: Row(
+                      children: [
+                        RandomAvatar(state.user?.username ?? "",
+                            height: 32, width: 32),
+                        SizedBox(
+                          width: 8,
+                        ),
+                        Text(
+                          state.user?.username ?? "",
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                    underline: SizedBox()),
                 Expanded(
                     child: Text(
                   state.secondsLeft.toString(),
                   textAlign: TextAlign.right,
                 )),
-                OutlinedButton.icon(label: Text("Raum verlassen"), onPressed: context.read<GameCubit>().exit, icon: Icon(Icons.logout))
               ],
             );
           },
@@ -417,8 +470,9 @@ class TeacherScreen extends StatelessWidget {
                                     controller: context
                                         .read<TeacherCubit>()
                                         .teamsController,
-                                    onChanged:
-                                        context.read<TeacherCubit>().setTeamCount,
+                                    onChanged: context
+                                        .read<TeacherCubit>()
+                                        .setTeamCount,
                                     enabled: teacherState.gameMode == 1,
                                     decoration: InputDecoration(
                                         border: OutlineInputBorder(),
@@ -434,7 +488,7 @@ class TeacherScreen extends StatelessWidget {
                               OutlinedButton.icon(
                                 onPressed: context.read<GameCubit>().exit,
                                 icon: Icon(Icons.logout),
-                                label: Text("Raum schließen"),
+                                label: Text("Spiel beenden"),
                               ),
                             ],
                           ),
@@ -511,27 +565,62 @@ class TeacherScreen extends StatelessWidget {
 class SinglePlayerView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<GameCubit, AppState>(
-      builder: (context, state) {
-        List<User> players = state.gameRoom!.players;
-        players.sort((a, b) => b.points - a.points);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 32, top: 16, bottom: 16),
+          child: Text("Tabelle", style: TextStyle(fontSize: 24)),
+        ),
+        Expanded(
+          child: BlocBuilder<GameCubit, AppState>(
+            builder: (context, state) {
+              List<User> players = state.gameRoom!.players;
+              players.sort((a, b) => b.points - a.points);
 
-        return ListView.builder(
-            itemCount: players.length,
-            itemBuilder: (context, index) {
-              User user = players[index];
-              return Dismissible(
-                key: ValueKey(user.id),
-                onDismissed: (_) =>
-                    context.read<TeacherCubit>().removePlayer(user),
-                child: ListTile(
-                  leading: RandomAvatar(user.username),
-                  title: Text(user.username),
-                  subtitle: Text(user.points.toString()),
-                ),
-              );
-            });
-      },
+              return ListView.separated(
+                separatorBuilder: (context, index) => Divider(endIndent: 12, indent: 12,),
+                  itemCount: players.length,
+                  itemBuilder: (context, index) {
+                    User user = players[index];
+                    return Dismissible(
+                      background: Container(
+                        color: Colors.red[300],
+                        child: Center(
+                          child: Text(
+                            "Spieler entfernen",
+                            style: TextStyle(
+                              fontSize: 24,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                      key: ValueKey(user.id),
+                      onDismissed: (_) =>
+                          context.read<TeacherCubit>().removePlayer(user),
+                      child: ListTile(
+                        leading: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(width: 64,),
+                            Text("${index + 1}.", style: TextStyle(fontSize: 24),),
+                            SizedBox(width: 16,),
+                            RandomAvatar(user.username, width: 44, height: 44),
+                            SizedBox(
+                              width: 16,
+                            )
+                          ],
+                        ),
+                        title: Text(user.username),
+                        subtitle: Text(user.points.toString()),
+                      ),
+                    );
+                  });
+            },
+          ),
+        ),
+      ],
     );
   }
 }
@@ -546,99 +635,118 @@ class TeamPlayView extends StatelessWidget {
             List<User> players = List.from(appState.gameRoom?.players ?? []);
             players.sort((a, b) => b.points - a.points);
 
-            return Row(
+            return Column(
               children: [
                 Expanded(
-                  flex: 1,
-                  child: ListView.builder(
-                      itemCount: players.length,
-                      itemBuilder: (context, index) {
-                        User user = players[index];
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: 1,
+                        child: ListView.separated(
+                          separatorBuilder: (_, __) => Divider(endIndent: 12, indent: 12,),
+                            itemCount: players.length,
+                            itemBuilder: (context, index) {
+                              User user = players[index];
 
-                        return Draggable(
-                          data: user,
-                          feedback: Material(
-                            child: Chip(
-                              avatar: RandomAvatar(user.username),
-                              label: Text(user.username),
-                            ),
-                          ),
-                          child: ListTile(
-                            leading: RandomAvatar(user.username,
-                                width: 44, height: 44),
-                            title: Text(user.username),
-                            tileColor: teacherState.membership[user.id] == null
-                                ? null
-                                : TeacherCubit.teamColors[
-                                        teacherState.membership[user.id]!]
-                                    .withAlpha(150),
-                          ),
-                        );
-                      }),
-                ),
-                SizedBox(width: 16),
-                Expanded(
-                    flex: 4,
-                    child: Wrap(
-                      alignment: WrapAlignment.center,
-                      runAlignment: WrapAlignment.center,
-                      children: [
-                        for (int i = 0; i < teacherState.teamCount; i++)
-                          Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: DragTarget<User>(
-                              onWillAcceptWithDetails: (_) => true,
-                              onAcceptWithDetails: (details) {
-                                context
-                                    .read<TeacherCubit>()
-                                    .setMembership(details.data, i);
-                              },
-                              builder: (context, candidateData, rejectedData) {
-                                Iterable<User> users = appState
-                                    .gameRoom!.players
-                                    .where((element) =>
-                                        (teacherState.membership[element.id] ??
-                                            -1) ==
-                                        i);
-
-                                return Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Container(
-                                      height: 200,
-                                      width: 200,
-                                      color: TeacherCubit.teamColors[i]
+                              return Draggable(
+                                data: user,
+                                feedback: Material(
+                                  child: Chip(
+                                    avatar: RandomAvatar(user.username),
+                                    label: Text(user.username),
+                                  ),
+                                ),
+                                child: ListTile(
+                                  leading: RandomAvatar(user.username,
+                                      width: 44, height: 44),
+                                  title: Text(user.username),
+                                  tileColor: teacherState.membership[user.id] ==
+                                          null
+                                      ? null
+                                      : TeacherCubit.teamColors[
+                                              teacherState.membership[user.id]!]
                                           .withAlpha(150),
-                                      child: Wrap(
-                                        alignment: WrapAlignment.center,
-                                        runAlignment: WrapAlignment.center,
-                                        runSpacing: 4,
-                                        spacing: 4,
+                                ),
+                              );
+                            }),
+                      ),
+                      SizedBox(width: 16),
+                      Expanded(
+                          flex: 4,
+                          child: Wrap(
+                            alignment: WrapAlignment.center,
+                            runAlignment: WrapAlignment.center,
+                            children: [
+                              for (int i = 0; i < teacherState.teamCount; i++)
+                                Padding(
+                                  padding: const EdgeInsets.all(8.0),
+                                  child: DragTarget<User>(
+                                    onWillAcceptWithDetails: (_) => true,
+                                    onAcceptWithDetails: (details) {
+                                      context
+                                          .read<TeacherCubit>()
+                                          .setMembership(details.data, i);
+                                    },
+                                    builder:
+                                        (context, candidateData, rejectedData) {
+                                      Iterable<User> users = appState
+                                          .gameRoom!.players
+                                          .where((element) =>
+                                              (teacherState
+                                                      .membership[element.id] ??
+                                                  -1) ==
+                                              i);
+
+                                      return Column(
+                                        mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          for (User user in users)
-                                            Chip(
-                                              avatar:
-                                                  RandomAvatar(user.username),
-                                              label: Text(user.username),
-                                            )
+                                          Container(
+                                            height: 220,
+                                            width: 220,
+                                            color: TeacherCubit.teamColors[i]
+                                                .withAlpha(150),
+                                            child: Wrap(
+                                              alignment: WrapAlignment.center,
+                                              runAlignment:
+                                                  WrapAlignment.center,
+                                              runSpacing: 4,
+                                              spacing: 4,
+                                              children: [
+                                                for (User user in users)
+                                                  Chip(
+                                                    avatar: RandomAvatar(
+                                                        user.username),
+                                                    label: Text(user.username),
+                                                  )
+                                              ],
+                                            ),
+                                          ),
+                                          SizedBox(
+                                            height: 8,
+                                          ),
+                                          Text(
+                                            users
+                                                .map((e) => e.points)
+                                                .sum
+                                                .toString(),
+                                            style: TextStyle(
+                                                fontSize: 32,
+                                                color: Colors.black38),
+                                          )
                                         ],
-                                      ),
-                                    ),
-                                    SizedBox(
-                                      height: 8,
-                                    ),
-                                    Text(
-                                      users.map((e) => e.points).sum.toString(),
-                                      style: TextStyle(
-                                          fontSize: 32, color: Colors.black38),
-                                    )
-                                  ],
-                                );
-                              },
-                            ),
-                          )
-                      ],
-                    ))
+                                      );
+                                    },
+                                  ),
+                                )
+                            ],
+                          ))
+                    ],
+                  ),
+                ),
+                Text(
+                  "Ziehe die Spieler in die jeweiligen Teams!",
+                  style: TextStyle(fontSize: 24, color: Colors.black38),
+                )
               ],
             );
           },

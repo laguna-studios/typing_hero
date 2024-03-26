@@ -20,6 +20,7 @@ import 'package:uuid/uuid.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 const String ip = "0.0.0.0";
+const int port = 9999;
 
 void main() async {
   GameServer server = GameServer();
@@ -40,7 +41,7 @@ class GameServer {
   int _getRandomRoomPin() {
     int pin;
     do {
-      pin = _random.nextInt(899) + 100;
+      pin = _random.nextInt(899999) + 100000;
     }
     while (rooms.any((room) => room.pin == pin));
 
@@ -171,6 +172,17 @@ class GameServer {
         rooms.add(room);
         _send(userId, "GameRoom", room.toJson());
 
+        // remove room after 6 hours
+        Future.delayed(const Duration(hours: 6), () {
+          rooms.removeWhere((element) => element.pin == room.pin);
+
+          // log room removal
+          print("[*] Room removed with pin ${room.pin}");
+        });
+
+        // log room creation
+        print("[*] Room created with pin ${room.pin}");
+
       case "CloseRoomMessage":
         CloseRoomMessage req = CloseRoomMessage.fromJson(json);
 
@@ -235,7 +247,6 @@ class GameServer {
 
       case "ReconnectMessage":
         ReconnectMessage req = ReconnectMessage.fromJson(json);
-        print(req);
 
         // user doesn't exist
         if (!connections.containsKey(req.oldUserId)) {
@@ -356,6 +367,6 @@ class GameServer {
   }
 
   void run() {
-    serve(_handler, ip, 9999);
+    serve(_handler, ip, port);
   }
 }
