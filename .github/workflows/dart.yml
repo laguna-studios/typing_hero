@@ -20,6 +20,12 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Build Web
+        run: flutter build web
+      
+      - name: Compress Web
+        run: tar -czvf web.tar.gz build/web
+
       - name: Compile Server
         run: dart compile exe server/server.dart
 
@@ -27,6 +33,6 @@ jobs:
         uses: ncipollo/release-action@v1.14.0
         with:
           allowUpdates: true
-          artifact: server/server.exe
+          artifacts: server/server.exe,web.tar.gz
           makeLatest: true
           tag: Backend
