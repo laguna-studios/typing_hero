@@ -16,7 +16,7 @@ Future<void> main() async {
       storageDirectory: HydratedStorage.webStorageDirectory);
 
   runApp(TypingApp(
-    gameRepository: GameRepository(hostname: "server.lagunastudios.de", port: 9999),
+    gameRepository: GameRepository(hostname: "lagunacademy.de", port: 443),
   ));
 }
 

@@ -62,7 +62,7 @@ class GameRepository {
   Future<void> _connectToServer({bool debug = false}) async {
     try {
       _webSocketChannel =
-          WebSocketChannel.connect(Uri.parse("ws://$hostname:$port"));
+          WebSocketChannel.connect(Uri.parse("wss://$hostname:$port/clients"));
 
       await _webSocketChannel.ready;
       if (debug) { _errorStreamController.add("Verbindung zum Server hergestellt"); }
