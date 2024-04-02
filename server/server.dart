@@ -19,11 +19,23 @@ import 'package:typing_hero/types/startgamemessage.dart';
 import 'package:uuid/uuid.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-const String ip = "0.0.0.0";
-const int port = 9999;
+void main(List<String> args) async {
 
-void main() async {
-  GameServer server = GameServer();
+  // check args length
+  if (args.length != 2) {
+    print("Usage: server <host> <port>");
+    return;
+  }
+
+  String host = args[0];
+  int? port = int.tryParse(args[1]);
+
+  if (port == null) {
+    print("Port must be a number!");
+    return;
+  }
+
+  GameServer server = GameServer(host: host, port: port);
   server.run();
 }
 
@@ -34,7 +46,10 @@ class GameServer {
   final Map<String, WebSocketChannel?> connections = {};
   final List<GameRoom> rooms = [];
 
-  GameServer() {
+  final int port;
+  final String host;
+
+  GameServer({required this.host, required this.port}) {
     _handler = webSocketHandler(_onNewConnection);
   }
   
@@ -367,6 +382,7 @@ class GameServer {
   }
 
   void run() {
-    serve(_handler, ip, port);
+    print("[+] Server is running on $host:$port");
+    serve(_handler, host, port);
   }
 }
